@@ -152,12 +152,17 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 .budget{background:var(--panel);border-radius:14px;padding:12px 14px;margin:8px 0 4px}
 .budget .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.budget input{width:110px}
 .bar{height:10px;background:var(--bg);border-radius:5px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--herb)}.bar i.over{background:var(--tom)}
+.seg{display:grid;grid-template-columns:1fr 1fr 1fr;background:var(--panel);border-radius:999px;padding:4px;margin-bottom:12px}
+.seg button{font:inherit;font-weight:800;min-height:42px;border:0;border-radius:999px;background:none;color:var(--mute);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.12)}.seg small{font-weight:600;opacity:.7}
+.trybar{display:flex;gap:8px;flex-wrap:wrap;background:var(--panel);border-radius:14px;padding:12px 14px;margin-top:14px;align-items:center}.trybar p{margin:0;flex-basis:100%;font-size:14px;color:var(--mute)}
 </style>
 </head>
 <body>
 <header class="top"><h1>Recipe Box</h1><span class="topr"><span id="sync" class="sync"></span><button id="pasteTop" class="pastebtn">Paste recipe</button></span></header>
 <main>
 <section id="v-recipes" class="view">
+  <div class="seg" role="tablist"><button data-box="mine" aria-pressed="true">My recipes <small id="nMine"></small></button><button data-box="try" aria-pressed="false">To try <small id="nTry"></small></button><button data-box="idea" aria-pressed="false">Ideas <small id="nIdea"></small></button></div>
   <input id="q" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes">
   <div class="tools"><button id="wcim" class="btn">What can I make?</button><button id="askAI" class="btn">Ask Claude for ideas</button></div>
   <div id="cuis" class="chips cuis"></div>
@@ -237,7 +242,7 @@ function guessCuisine(r){const t=(r.title||'').toLowerCase(),ing=(r.ingredients|
   for(const[n,re]of CUIS)if(re.test(t))return n;
   let best='',bs=1;for(const[n,re]of CUIS){const g=new RegExp(re.source,'g');const m=(ing.match(g)||[]).length;if(m>bs){bs=m;best=n}}return best}
 const cuisineOf=r=>r.cuisine!==undefined&&r.cuisine!==null?r.cuisine:guessCuisine(r);
-let cui='Any';
+let cui='Any',boxView='mine';const inBox=r=>(r.box||'mine')===boxView;
 const AISLES=['Produce','Meat & seafood','Dairy & eggs','Bakery','Pantry','Spices','Frozen','Other'];
 const TILES=[['var(--tom)','#fff'],['var(--but)','#1d1b16'],['var(--herb)','#fff'],['var(--plum)','#fff'],['var(--sky)','#fff']];
 let plan={},recipes=[],shop=[],cat='All',cur=null,serv=null,got=new Set(),imgs=[];
@@ -271,14 +276,18 @@ function setSync(t){$('#sync').textContent=t}
 function tileFor(r){let h=0;for(const c of r.title||'')h=(h*31+c.charCodeAt(0))>>>0;return TILES[h%TILES.length]}
 function initials(t){return(t||'?').split(/\s+/).filter(w=>/^[A-Za-z0-9]/.test(w)).slice(0,2).map(w=>w[0].toUpperCase()).join('')}
 function renderRecipes(){
-  const q=$('#q').value.trim().toLowerCase();
-  const used=['All',...(recipes.some(r=>r.fav)?['★ Favourites']:[]),...CATS.filter(c=>recipes.some(r=>r.category===c))];
+  const q=$('#q').value.trim().toLowerCase();const all=recipes;const vis=all.filter(inBox);
+  $('#nMine').textContent=all.filter(r=>!r.box).length||'';$('#nTry').textContent=all.filter(r=>r.box==='try').length||'';$('#nIdea').textContent=all.filter(r=>r.box==='idea').length||'';for(const b of document.querySelectorAll('[data-box]'))b.setAttribute('aria-pressed',b.dataset.box===boxView);
+  const used=['All',...(vis.some(r=>r.fav)?['★ Favourites']:[]),...CATS.filter(c=>vis.some(r=>r.category===c))];
   if(!used.includes(cat))cat='All';
-  $('#cats').innerHTML=recipes.length?used.map(c=>`<button class="chip" data-cat="${esc(c)}" aria-pressed="${c===cat}">${esc(c)}</button>`).join(''):'';
-  const cnt={};for(const r of recipes){const c=cuisineOf(r);if(c)cnt[c]=(cnt[c]||0)+1}
-  $('#cuis').innerHTML=recipes.length?['Any',...CUI_NAMES].map(c=>`<button class="chip${c!=='Any'&&!cnt[c]?' none':''}" data-cui="${esc(c)}" aria-pressed="${c===cui}">${c==='Any'?'All cuisines':esc(c)}${c!=='Any'&&cnt[c]?`<small>${cnt[c]}</small>`:''}</button>`).join(''):'';
-  if(!recipes.length){$('#grid').innerHTML=`<div class="empty"><h3>Your recipe box is empty</h3><p class="meta">Import a recipe from a Facebook post, a screenshot or a website, or type in a family favourite.</p><div class="acts"><button class="btn primary" data-go="add">Add a recipe</button><button class="btn" id="samples">Try two samples</button></div></div>`;return}
-  const list=recipes.filter(r=>(cat==='All'||r.category===cat||(cat==='★ Favourites'&&r.fav))&&(cui==='Any'||cuisineOf(r)===cui)&&(!q||(r.title+' '+(r.ingredients||[]).map(i=>i.item).join(' ')).toLowerCase().includes(q)));
+  $('#cats').innerHTML=vis.length?used.map(c=>`<button class="chip" data-cat="${esc(c)}" aria-pressed="${c===cat}">${esc(c)}</button>`).join(''):'';
+  const cnt={};for(const r of vis){const c=cuisineOf(r);if(c)cnt[c]=(cnt[c]||0)+1}
+  $('#cuis').innerHTML=vis.length?['Any',...CUI_NAMES].map(c=>`<button class="chip${c!=='Any'&&!cnt[c]?' none':''}" data-cui="${esc(c)}" aria-pressed="${c===cui}">${c==='Any'?'All cuisines':esc(c)}${c!=='Any'&&cnt[c]?`<small>${cnt[c]}</small>`:''}</button>`).join(''):'';
+  if(!vis.length&&boxView==='try'){$('#grid').innerHTML=`<div class="empty"><h3>Nothing to try yet</h3><p class="meta">Browse Ideas and tap <b>Add to To try</b> on the ones you like.</p></div>`;return}
+  if(!vis.length&&boxView==='idea'){$('#grid').innerHTML=`<div class="empty"><h3>No ideas right now</h3><p class="meta">New vis from Claude land here when you have signal.</p><div class="acts"><button class="btn primary" id="askAI3">Ask Claude for ideas</button></div></div>`;return}
+  if(!all.length){$('#grid').innerHTML=`<div class="empty"><h3>Your recipe box is empty</h3><p class="meta">Import a recipe from a Facebook post, a screenshot or a website, or type in a family favourite.</p><div class="acts"><button class="btn primary" data-go="add">Add a recipe</button><button class="btn" id="samples">Try two samples</button></div></div>`;return}
+  if(!vis.length){$('#grid').innerHTML=`<div class="empty"><h3>No saved recipes yet</h3><p class="meta">Browse <b>Ideas</b> for recipes from Claude, or tap <b>Add</b> to save your own.</p></div>`;return}
+  const list=vis.filter(r=>(cat==='All'||r.category===cat||(cat==='★ Favourites'&&r.fav))&&(cui==='Any'||cuisineOf(r)===cui)&&(!q||(r.title+' '+(r.ingredients||[]).map(i=>i.item).join(' ')).toLowerCase().includes(q)));
   $('#grid').innerHTML=list.length?`<div class="grid">${list.map(r=>{const[c,t]=tileFor(r);return`<button class="card" data-id="${esc(r.id)}"><div class="tile" style="--c:${c};--t:${t}">${PH[r.id]?`<img src="${PH[r.id]}" alt="">`:esc(initials(r.title))}${r.fav?'<span class="fav">★</span>':''}</div><div class="cbody"><b>${esc(r.title)}</b><span class="meta">${esc([r.time,r.servings?'serves '+r.servings:'',cuisineOf(r)||r.category].filter(Boolean).join(' · '))}</span></div></button>`}).join('')}</div>`:`<p class="meta" style="margin-top:20px">${q?`No recipes match “${esc(q)}”.`:`No ${cui!=='Any'?esc(cui)+' ':''}${cat!=='All'?esc(cat).toLowerCase()+' ':''}recipes yet. When you save one, it shows up here, or set the cuisine in Edit.`}</p>`;
 }
 function renderShop(){{const left=shop.filter(x=>!x.done);let t=0,h=0;for(const x of left){const c=costOf(x.item,x.qty,x.unit);if(c!=null){t+=c;h++}}
@@ -316,7 +325,8 @@ function showRecipe(){const r=cur,f=r.servings&&serv?serv/r.servings:1,nu=nutOf(
   ${(r.steps||[]).length?`<h3 class="sec">Method</h3><ol class="steps">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}
   ${r.notes?`<h3 class="sec">Notes</h3><div class="notes">${esc(r.notes)}</div>`:''}
   ${src}
-  <div class="acts"><button class="btn" data-act="cooked">I cooked this today</button><button class="btn" data-act="share">Share</button><button class="btn" data-act="edit">Edit</button><button class="btn ghost" data-act="del">Delete</button></div>`,'view')}
+  ${r.box==='idea'?`<div class="trybar"><p>This is an idea from Claude.</p><button class="btn primary" data-act="totry">Add to To try</button><button class="btn" data-act="keep">Keep in My recipes</button><button class="btn ghost" data-act="nope">Not for me</button></div>`:r.box==='try'?`<div class="trybar"><p>This one is in To try.</p><button class="btn primary" data-act="keep">Keep in My recipes</button><button class="btn ghost" data-act="nope">Not for me</button></div>`:''}
+  <div class="acts"><button class="btn" data-act="cooked">I cooked this today</button><button class="btn" data-act="share">Share</button><button class="btn" data-act="edit">Edit</button>${!r.box?'<button class="btn ghost" data-act="totry">Move to To try</button>':''}<button class="btn ghost" data-act="del">Delete</button></div>`,'view')}
 function addToShop(items,title){let n=0;for(let i of items){if(!i.item)continue;const key=i.item.toLowerCase()+'|'+(i.unit||'');if(i.qty!=null&&(!i.unit||PL[i.unit]))i={...i,qty:Math.ceil(i.qty-0.05)};const ex=shop.find(s=>!s.done&&s.item.toLowerCase()+'|'+(s.unit||'')===key);
   if(ex){if(ex.qty!=null&&i.qty!=null)ex.qty+=i.qty;if(title&&!ex.from.includes(title))ex.from.push(title)}else shop.push({id:uid(),qty:i.qty??null,unit:i.unit||'',item:i.item,aisle:i.aisle||guessAisle(i.item),done:false,from:title?[title]:[]});n++}
   saveShop();return n}
@@ -341,7 +351,7 @@ function openEditor(r){r=r||{};cur=r.id?r:null;
     $('#ph-in').addEventListener('change',async ev=>{const fl=ev.target.files[0];if(!fl)return;try{newPh=await shrink(fl);dropPh=false;phDraw()}catch(err){toast('Could not use that photo')}});const rm=$('#ph-rm');if(rm)rm.addEventListener('click',()=>{newPh=null;dropPh=true;phDraw()})};phDraw();
   $('#ed').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);const title=f.get('title').trim();if(!title){$('#ed-err').textContent='Give it a title.';return}
     const ingredients=f.get('ings').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=parseLine(l);p.aisle=prior.get(p.item.toLowerCase())||guessAisle(p.item);return p});
-    const rec={id:r.id||uid(),title,category:f.get('category'),cuisine:f.get('cuisine')||'',servings:+f.get('servings')||null,time:f.get('time').trim(),ingredients,steps:f.get('steps').split('\n').map(s=>s.replace(/^\s*(step\s*)?\d+[.):]\s*/i,'').trim()).filter(Boolean),notes:f.get('notes').trim(),source:f.get('source').trim(),added:r.added||Date.now(),...(r.fav?{fav:true}:{}),...(r.cooked?{cooked:r.cooked}:{})};
+    const rec={id:r.id||uid(),title,category:f.get('category'),cuisine:f.get('cuisine')||'',servings:+f.get('servings')||null,time:f.get('time').trim(),ingredients,steps:f.get('steps').split('\n').map(s=>s.replace(/^\s*(step\s*)?\d+[.):]\s*/i,'').trim()).filter(Boolean),notes:f.get('notes').trim(),source:f.get('source').trim(),added:r.added||Date.now(),...(r.fav?{fav:true}:{}),...(r.cooked?{cooked:r.cooked}:{}),...(r.box?{box:r.box}:{})};
     if(newPh)photoPut(rec.id,newPh).then(renderAll).catch(()=>toast('Photo could not be saved'));else if(dropPh)photoDel(rec.id).then(renderAll);
     putRecipe(rec);toast('Recipe saved');go('recipes');openRecipe(rec.id)})}
 
@@ -404,7 +414,7 @@ function doImport(){const text=$('#imp-text').value.trim();if(!text){stat('Paste
   if(/^\{\s*"rb"\s*:\s*1/.test(text)){$('#imp-text').value='';handleText(text);return}
   const code=tryCode(text);
   if(code){if(code.length===1){$('#imp-text').value='';stat('Recipe code read. Check it and save.');openEditor({...cleanRecipe(code[0]),id:undefined});return}
-    let n=0;for(const r of code){const c=cleanRecipe(r);if(!recipes.some(x=>x.id===c.id||x.title.toLowerCase()===c.title.toLowerCase())){recipes.unshift(c);n++}}go('recipes');saveLocal();renderAll();$('#imp-text').value='';stat(`Added ${n} recipe${n===1?'':'s'}.`);return}
+    let n=0;for(const r of code){const c=cleanRecipe(r);if(!recipes.some(x=>x.id===c.id||x.title.toLowerCase()===c.title.toLowerCase())){recipes.unshift({...c,box:'idea'});n++}}boxView='idea';go('recipes');saveLocal();renderAll();$('#imp-text').value='';stat(`Added ${n} recipe${n===1?'':'s'} to Ideas.`);return}
   const r=readPost(text);if(!r.ingredients.length&&!r.steps.length){stat('Could not spot a recipe in that. Check it was the whole post, or type it in.',true);return}
   $('#imp-text').value='';stat(r.ingredients.length?'Done. Check it over and save.':'No ingredient list found. Add it in the editor.');openEditor(r)}
 $('#imp-go').addEventListener('click',doImport);
@@ -414,13 +424,13 @@ function bk(t,err){const s=$('#bk-status');s.textContent=t;s.classList.toggle('e
 $('#exportBtn').addEventListener('click',async()=>{let photos={};try{const all=await photoAll();for(const k in all)photos[k]=await blobToData(all[k])}catch(e){}const data=JSON.stringify({app:'recipe-box',saved:new Date().toISOString(),recipes,shop,plan,photos,pantry:[...pantry],prices,budget});const name='recipe-box-backup-'+new Date().toISOString().slice(0,10)+'.json';
   try{const f=new File([data],name,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Recipe Box backup'});bk('Backup shared. Choose “Save to Files” to keep it.');return}}catch(e){if(e&&e.name==='AbortError')return}
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();bk('Backup saved to your Downloads.')});
-$('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());const rs=(d.recipes||(Array.isArray(d)?d:[])).map(x=>({...cleanRecipe(x),...(x.fav?{fav:true}:{}),...(x.cooked?{cooked:x.cooked}:{})}));let n=0;for(const r of rs){const i=recipes.findIndex(x=>x.id===r.id);if(i>=0)recipes[i]=r;else{recipes.push(r);n++}}
+$('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());const rs=(d.recipes||(Array.isArray(d)?d:[])).map(x=>({...cleanRecipe(x),...(x.fav?{fav:true}:{}),...(x.cooked?{cooked:x.cooked}:{}),...(x.box?{box:x.box}:{})}));let n=0;for(const r of rs){const i=recipes.findIndex(x=>x.id===r.id);if(i>=0)recipes[i]=r;else{recipes.push(r);n++}}
   if(Array.isArray(d.shop)&&d.shop.length&&!shop.length)shop=d.shop;if(d.plan&&!Object.keys(plan).length)plan=d.plan;if(d.prices)prices={...d.prices,...prices};if(d.pantry)for(const x of d.pantry)pantry.add(x);if(d.budget&&!budget)budget=+d.budget;saveExtra();for(const k in d.photos||{}){try{await photoPut(k,await (await fetch(d.photos[k])).blob())}catch(e){}}saveLocal();renderAll();bk(`Restored. ${n} new recipe${n===1?'':'s'} added, ${rs.length-n} updated.`)}catch(err){bk('That file is not a Recipe Box backup.',true)}});
 
 /* ---------- recipes sent by Claude (recipes.json beside the app) ---------- */
 async function pullFeed(){try{const r=await fetch('recipes.json',{cache:'no-store'});if(!r.ok)return;const list=await r.json();let seen=[];try{seen=JSON.parse(localStorage.getItem('recipebox.feed')||'[]')}catch(e){}
-  let n=0;for(const x of (Array.isArray(list)?list:list.recipes||[])){if(!x||!x.id||seen.includes(x.id))continue;seen.push(x.id);if(!recipes.some(y=>y.id===x.id)){recipes.unshift(cleanRecipe({...x,added:Date.now()}));n++}}
-  try{localStorage.setItem('recipebox.feed',JSON.stringify(seen))}catch(e){}if(n){saveLocal();renderAll();toast(`${n} new recipe${n===1?'':'s'} from Claude`)}}catch(e){}}
+  let n=0;for(const x of (Array.isArray(list)?list:list.recipes||[])){if(!x||!x.id||seen.includes(x.id))continue;seen.push(x.id);if(!recipes.some(y=>y.id===x.id)){recipes.unshift({...cleanRecipe({...x,added:Date.now()}),box:'idea'});n++}}
+  try{localStorage.setItem('recipebox.feed',JSON.stringify(seen))}catch(e){}if(n){if(!recipes.some(r=>!r.box))boxView='idea';saveLocal();renderAll();toast(`${n} new recipe idea${n===1?'':'s'} from Claude`)}}catch(e){}}
 $('#manual').addEventListener('click',()=>openEditor(null));
 
 /* ---------- nutrition (estimates per 100 g: kcal, protein, carbs, fat; grams per cup; grams each; grams per can) ---------- */
@@ -567,7 +577,7 @@ function mkDraw(){if(!$('#mkchips'))return;const q=$('#mkq').value.trim().toLowe
   const rows=recipes.map(r=>{const ings=(r.ingredients||[]).filter(i=>i.item);const miss=ings.filter(i=>!haveIng(i));return{r,miss,have:ings.length-miss.length,n:ings.length}}).filter(x=>x.n)
     .sort((a,b)=>a.miss.length-b.miss.length||(b.have/b.n)-(a.have/a.n));
   const stale=recipes.filter(r=>r.fav&&(!r.cooked||!r.cooked.length||(Date.now()-new Date(r.cooked[r.cooked.length-1]+'T12:00'))>30*864e5));
-  $('#mkres').innerHTML=(rows.length?rows.slice(0,12).map(x=>`<div class="mkrow"><button class="pe-t" data-open="${esc(x.r.id)}">${PH[x.r.id]?`<img src="${PH[x.r.id]}" alt="">`:`<i style="--c:${tileFor(x.r)[0]}"></i>`}<span>${esc(x.r.title)}<small>${x.miss.length?`Missing ${x.miss.length}: ${esc(x.miss.slice(0,4).map(i=>core(i.item)).join(', '))}${x.miss.length>4?'…':''}`:'You have everything'}</small></span></button>${x.miss.length?`<button class="btn sm" data-miss="${esc(x.r.id)}">Add missing</button>`:''}</div>`).join(''):`<p class="meta">No recipes yet.</p>`)
+  $('#mkres').innerHTML=(rows.length?rows.slice(0,12).map(x=>`<div class="mkrow"><button class="pe-t" data-open="${esc(x.r.id)}">${PH[x.r.id]?`<img src="${PH[x.r.id]}" alt="">`:`<i style="--c:${tileFor(x.r)[0]}"></i>`}<span>${esc(x.r.title)}${x.r.box?` <small style="display:inline;color:var(--tom)">· ${x.r.box==='try'?'to try':'idea'}</small>`:''}<small>${x.miss.length?`Missing ${x.miss.length}: ${esc(x.miss.slice(0,4).map(i=>core(i.item)).join(', '))}${x.miss.length>4?'…':''}`:'You have everything'}</small></span></button>${x.miss.length?`<button class="btn sm" data-miss="${esc(x.r.id)}">Add missing</button>`:''}</div>`).join(''):`<p class="meta">No recipes yet.</p>`)
    +(stale.length?`<h3 class="sec">Favourites you haven’t made lately</h3>${stale.map(r=>`<button class="pe-t pick" data-open="${esc(r.id)}">${PH[r.id]?`<img src="${PH[r.id]}" alt="">`:`<i style="--c:${tileFor(r)[0]}"></i>`}<span>${esc(r.title)}<small>${esc(cookedTxt(r)||'Not cooked yet')}</small></span></button>`).join('')}`:'')}
 
 /* ---------- ask Claude ---------- */
@@ -624,6 +634,9 @@ $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'){closeSheet();
   else if(act==='plan')planChooser();
   else if(act==='cooked')markCooked(cur.id);
   else if(act==='share')shareRecipe(cur);
+  else if(act==='keep'){delete cur.box;putRecipe(cur);toast('Moved to My recipes')}
+  else if(act==='totry'){cur.box='try';putRecipe(cur);toast('Added to To try')}
+  else if(act==='nope'){const id=cur.id;closeSheet();delRecipe(id);toast('Removed')}
   else if(act==='less'&&serv>1){serv--;showRecipe()}
   else if(act==='more'){serv++;showRecipe()}
   else if(act==='toshop'){const f=cur.servings&&serv?serv/cur.servings:1;const n=addToShop(cur.ingredients.map(i=>({...i,qty:i.qty!=null?i.qty*f:null})),cur.title);toast(`Added ${n} item${n===1?'':'s'} to your list`)}
@@ -651,7 +664,7 @@ $('#days').addEventListener('click',e=>{const o=e.target.closest('[data-open]'),
 $('#planShop').addEventListener('click',()=>{let n=0,m=0;for(const d of planDays()){for(const e of plan[dkey(d)]||[]){const r=recipes.find(x=>x.id===e.rid);if(!r)continue;const f=r.servings&&e.s?e.s/r.servings:1;n+=addToShop(r.ingredients.map(i=>({...i,qty:i.qty!=null?i.qty*f:null})),r.title);m++}}toast(`Added ${m} recipe${m===1?'':'s'} (${n} items) to your list`)});
 {let arm=0;$('#planClear').addEventListener('click',e=>{if(Date.now()-arm<4000){for(const d of planDays())delete plan[dkey(d)];savePlan();e.target.textContent='Clear these days';arm=0}else{arm=Date.now();e.target.textContent='Tap again to clear';setTimeout(()=>e.target.textContent='Clear these days',4000)}})}
 
-$('#wcim').addEventListener('click',openMake);$('#askAI').addEventListener('click',askClaude);
+$('#wcim').addEventListener('click',openMake);document.querySelector('.seg').addEventListener('click',e=>{const b=e.target.closest('[data-box]');if(b){boxView=b.dataset.box;cat='All';renderRecipes()}});$('#grid').addEventListener('click',e=>{if(e.target.id==='askAI3')askClaude()});$('#askAI').addEventListener('click',askClaude);
 $('#shoptot').addEventListener('click',e=>{if(e.target.id==='pbook')openPriceBook()});
 $('#shop').addEventListener('click',e=>{const b=e.target.closest('[data-pr]');if(!b)return;const it=shop.find(x=>x.id===b.dataset.pr);if(it)openPrice(it.item,it.qty,it.unit)});
 $('#budgetIn').addEventListener('change',e=>{budget=parseFloat(e.target.value.replace(/[$,]/g,''))||0;saveExtra();renderPlan()});

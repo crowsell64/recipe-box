@@ -35,7 +35,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 .btn.primary{background:var(--tom);border-color:var(--tom);color:#fff}
 .btn.ghost{border-color:transparent;color:var(--mute)}
 .btn:disabled{opacity:.55}
-.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none}.chips::-webkit-scrollbar{display:none}.cuis .chip{border-color:transparent;background:var(--panel)}.cuis .chip[aria-pressed=true]{background:var(--tom);color:#fff}.chip.none{opacity:.5}.chip small{font-weight:600;opacity:.7;margin-left:4px}
 .chip{flex:none;font:inherit;font-weight:700;min-height:40px;padding:6px 15px;border-radius:999px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
 .chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:14px;margin-top:14px}
@@ -115,6 +115,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 <main>
 <section id="v-recipes" class="view">
   <input id="q" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes">
+  <div id="cuis" class="chips cuis"></div>
   <div id="cats" class="chips"></div>
   <div id="grid"></div>
 </section>
@@ -158,6 +159,24 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const CATS=['Breakfast','Mains','Soups','Salads','Sides','Baking','Desserts','Snacks','Drinks'];
+const CUIS=[['Newfoundland',/newfoundland|touton|jiggs|fish ?cakes?|salt cod|salt beef|partridgeberr|bakeapple|figgy duff|cod au gratin|pea soup|scrunchion|brewis|turr|moose|toutons|cod tongues|seal flipper|lassy|molasses bread/],
+ ['Canadian',/canadian|poutine|maple|tourti[eè]re|butter tart|nanaimo|bannock|montreal|caesar cocktail|split pea/],
+ ['Chinese',/chinese|soy sauce|hoisin|oyster sauce|five[- ]spice|bok choy|wonton|stir[- ]?fr|lo mein|chow mein|szechuan|sichuan|kung pao|general tso|sweet and sour|fried rice|dumpling|char siu|shaoxing/],
+ ['Japanese',/japanese|miso|teriyaki|sushi|ramen|mirin|dashi|katsu|udon|tempura|panko|wasabi/],
+ ['Thai',/\bthai\b|fish sauce|lemongrass|pad thai|galangal|kaffir|green curry|red curry|tom yum|satay/],
+ ['Indian',/indian|garam masala|tikka|masala|turmeric|\bdal\b|dhal|naan|biryani|paneer|tandoori|korma|vindaloo|chana|samosa|ghee/],
+ ['Mexican',/mexican|taco|tortilla|enchilada|salsa|jalape[nñ]o|chipotle|quesadilla|burrito|fajita|guacamole|nacho|refried/],
+ ['Italian',/italian|pasta|spaghetti|lasagn|risotto|parmesan|mozzarella|pesto|marinara|gnocchi|pizza|penne|fettuccine|ricotta|prosciutto|carbonara|bolognese|tiramisu/],
+ ['Greek',/greek|tzatziki|feta|gyro|souvlaki|moussaka|spanakopita|kalamata|orzo/],
+ ['Middle Eastern',/middle eastern|kebab|kabob|kofta|shawarma|hummus|falafel|tahini|sumac|za.?atar|pita|harissa|baba ganoush|tabbouleh/],
+ ['French',/french|bourguignon|gratin|ratatouille|cr[eê]pe|b[eé]arnaise|quiche|coq au vin|croissant|souffl/],
+ ['American',/american|bbq|barbecue|burger|mac and cheese|mac ?n ?cheese|meatloaf|pulled pork|cornbread|buffalo|sloppy joe|cajun|gumbo/]];
+const CUI_NAMES=CUIS.map(c=>c[0]);
+function guessCuisine(r){const t=(r.title||'').toLowerCase(),ing=(r.ingredients||[]).map(i=>i.item||'').join(' | ').toLowerCase();
+  for(const[n,re]of CUIS)if(re.test(t))return n;
+  let best='',bs=1;for(const[n,re]of CUIS){const g=new RegExp(re.source,'g');const m=(ing.match(g)||[]).length;if(m>bs){bs=m;best=n}}return best}
+const cuisineOf=r=>r.cuisine!==undefined&&r.cuisine!==null?r.cuisine:guessCuisine(r);
+let cui='Any';
 const AISLES=['Produce','Meat & seafood','Dairy & eggs','Bakery','Pantry','Spices','Frozen','Other'];
 const TILES=[['var(--tom)','#fff'],['var(--but)','#1d1b16'],['var(--herb)','#fff'],['var(--plum)','#fff'],['var(--sky)','#fff']];
 let recipes=[],shop=[],cat='All',cur=null,serv=null,got=new Set(),imgs=[];
@@ -195,9 +214,11 @@ function renderRecipes(){
   const used=['All',...CATS.filter(c=>recipes.some(r=>r.category===c))];
   if(!used.includes(cat))cat='All';
   $('#cats').innerHTML=recipes.length?used.map(c=>`<button class="chip" data-cat="${esc(c)}" aria-pressed="${c===cat}">${esc(c)}</button>`).join(''):'';
+  const cnt={};for(const r of recipes){const c=cuisineOf(r);if(c)cnt[c]=(cnt[c]||0)+1}
+  $('#cuis').innerHTML=recipes.length?['Any',...CUI_NAMES].map(c=>`<button class="chip${c!=='Any'&&!cnt[c]?' none':''}" data-cui="${esc(c)}" aria-pressed="${c===cui}">${c==='Any'?'All cuisines':esc(c)}${c!=='Any'&&cnt[c]?`<small>${cnt[c]}</small>`:''}</button>`).join(''):'';
   if(!recipes.length){$('#grid').innerHTML=`<div class="empty"><h3>Your recipe box is empty</h3><p class="meta">Import a recipe from a Facebook post, a screenshot or a website, or type in a family favourite.</p><div class="acts"><button class="btn primary" data-go="add">Add a recipe</button><button class="btn" id="samples">Try two samples</button></div></div>`;return}
-  const list=recipes.filter(r=>(cat==='All'||r.category===cat)&&(!q||(r.title+' '+(r.ingredients||[]).map(i=>i.item).join(' ')).toLowerCase().includes(q)));
-  $('#grid').innerHTML=list.length?`<div class="grid">${list.map(r=>{const[c,t]=tileFor(r);return`<button class="card" data-id="${esc(r.id)}"><div class="tile" style="--c:${c};--t:${t}">${esc(initials(r.title))}</div><div class="cbody"><b>${esc(r.title)}</b><span class="meta">${esc([r.time,r.servings?'serves '+r.servings:'',r.category].filter(Boolean).join(' · '))}</span></div></button>`}).join('')}</div>`:`<p class="meta" style="margin-top:20px">No recipes match “${esc(q)}”.</p>`;
+  const list=recipes.filter(r=>(cat==='All'||r.category===cat)&&(cui==='Any'||cuisineOf(r)===cui)&&(!q||(r.title+' '+(r.ingredients||[]).map(i=>i.item).join(' ')).toLowerCase().includes(q)));
+  $('#grid').innerHTML=list.length?`<div class="grid">${list.map(r=>{const[c,t]=tileFor(r);return`<button class="card" data-id="${esc(r.id)}"><div class="tile" style="--c:${c};--t:${t}">${esc(initials(r.title))}</div><div class="cbody"><b>${esc(r.title)}</b><span class="meta">${esc([r.time,r.servings?'serves '+r.servings:'',cuisineOf(r)||r.category].filter(Boolean).join(' · '))}</span></div></button>`}).join('')}</div>`:`<p class="meta" style="margin-top:20px">${q?`No recipes match “${esc(q)}”.`:`No ${cui!=='Any'?esc(cui)+' ':''}${cat!=='All'?esc(cat).toLowerCase()+' ':''}recipes yet. When you save one, it shows up here, or set the cuisine in Edit.`}</p>`;
 }
 function renderShop(){
   if(!shop.length){$('#shop').innerHTML=`<div class="shopempty">Your list is empty. Open a recipe and tap <b>Add to shopping list</b>, or add items above.</div>`;return}
@@ -220,7 +241,7 @@ function openRecipe(id){cur=recipes.find(r=>r.id===id);if(!cur)return;serv=cur.s
 function showRecipe(){const r=cur,f=r.servings&&serv?serv/r.servings:1;
   const src=/^https?:\/\//.test(r.source||'')?`<p><a class="src" href="${esc(r.source)}" target="_blank" rel="noopener">Original post</a></p>`:(r.source?`<p class="meta">From ${esc(r.source)}</p>`:'');
   openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>${esc(r.title)}</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
-  <p class="meta" style="margin:8px 0 0">${esc([r.category,r.time].filter(Boolean).join(' · '))}</p>
+  <p class="meta" style="margin:8px 0 0">${esc([cuisineOf(r),r.category,r.time].filter(Boolean).join(' · '))}</p>
   ${r.servings?`<div class="stepper"><button data-act="less" aria-label="Fewer servings">−</button><span>Serves ${serv}</span><button data-act="more" aria-label="More servings">+</button></div>`:''}
   <h3 class="sec">Ingredients</h3><ul class="ings">${(r.ingredients||[]).map((i,k)=>{const q={...i,qty:i.qty!=null?i.qty*f:null};return`<li data-ing="${k}" class="${got.has(k)?'got':''}">${qtyTxt(q)?`<b>${esc(qtyTxt(q))}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>
   <div class="acts"><button class="btn primary" data-act="toshop">Add to shopping list</button></div>
@@ -238,6 +259,7 @@ function openEditor(r){r=r||{};cur=r.id?r:null;
   <form class="form" id="ed">
    <label>Title<input name="title" value="${esc(r.title)}" required></label>
    <div class="two"><label>Category<select name="category">${CATS.map(c=>`<option${c===(r.category||'Mains')?' selected':''}>${c}</option>`).join('')}</select></label><label>Serves<input name="servings" type="number" min="1" inputmode="numeric" value="${esc(r.servings||'')}"></label><label>Time<input name="time" value="${esc(r.time)}" placeholder="45 min"></label></div>
+   <label>Cuisine<select name="cuisine"><option value="">None</option>${CUI_NAMES.map(c=>`<option${c===cuisineOf(r)?' selected':''}>${c}</option>`).join('')}</select></label>
    <label>Ingredients <small>One per line, e.g. 1 ½ cups flour</small><textarea name="ings" rows="9">${esc((r.ingredients||[]).map(ingLine).join('\n'))}</textarea></label>
    <label>Method <small>One step per line</small><textarea name="steps" rows="8">${esc((r.steps||[]).join('\n'))}</textarea></label>
    <label>Notes<textarea name="notes" rows="3">${esc(r.notes)}</textarea></label>
@@ -248,7 +270,7 @@ function openEditor(r){r=r||{};cur=r.id?r:null;
   const prior=new Map((r.ingredients||[]).map(i=>[i.item.toLowerCase(),i.aisle]));
   $('#ed').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);const title=f.get('title').trim();if(!title){$('#ed-err').textContent='Give it a title.';return}
     const ingredients=f.get('ings').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=parseLine(l);p.aisle=prior.get(p.item.toLowerCase())||guessAisle(p.item);return p});
-    const rec={id:r.id||uid(),title,category:f.get('category'),servings:+f.get('servings')||null,time:f.get('time').trim(),ingredients,steps:f.get('steps').split('\n').map(s=>s.replace(/^\s*(step\s*)?\d+[.):]\s*/i,'').trim()).filter(Boolean),notes:f.get('notes').trim(),source:f.get('source').trim(),added:r.added||Date.now()};
+    const rec={id:r.id||uid(),title,category:f.get('category'),cuisine:f.get('cuisine')||'',servings:+f.get('servings')||null,time:f.get('time').trim(),ingredients,steps:f.get('steps').split('\n').map(s=>s.replace(/^\s*(step\s*)?\d+[.):]\s*/i,'').trim()).filter(Boolean),notes:f.get('notes').trim(),source:f.get('source').trim(),added:r.added||Date.now()};
     putRecipe(rec);toast('Recipe saved');go('recipes');openRecipe(rec.id)})}
 
 /* ---------- import ---------- */
@@ -278,7 +300,7 @@ function readPost(raw){
   if(steps.length<=2&&steps.join(' ').length>(steps.length===1?150:300))steps=steps.join(' ').split(/(?<=[.!])\s+(?=[A-Z])/);
   return{title,category:guessCat(title+' '+ings.join(' ')),servings:servM?+servM[1]:null,time:timeM?timeM[1].trim():'',
     ingredients:ings.map(l=>{const p=parseLine(l);p.aisle=guessAisle(p.item);return p}).filter(p=>p.item),steps:steps.map(s=>s.replace(/^\s*(step\s*)?\d+[.):]\s*/i,'').trim()).filter(Boolean),notes:notes.join('\n'),source:url}}
-function cleanRecipe(r){return{id:r.id||uid(),title:String(r.title||'Untitled recipe'),category:CATS.includes(r.category)?r.category:'Mains',servings:+r.servings||null,time:r.time||'',
+function cleanRecipe(r){return{id:r.id||uid(),title:String(r.title||'Untitled recipe'),category:CATS.includes(r.category)?r.category:'Mains',...(CUI_NAMES.includes(r.cuisine)?{cuisine:r.cuisine}:{}),servings:+r.servings||null,time:r.time||'',
   ingredients:(r.ingredients||[]).map(i=>typeof i==='string'?parseLine(i):i).filter(i=>i&&i.item).map(i=>({qty:typeof i.qty==='number'?i.qty:(i.qty?toNum(String(i.qty)):null),unit:i.unit?(UN[String(i.unit).toLowerCase()]||i.unit):'',item:i.item,aisle:AISLES.includes(i.aisle)?i.aisle:guessAisle(i.item)})),
   steps:(r.steps||[]).filter(Boolean).map(String),notes:r.notes||'',source:r.source||'',added:r.added||Date.now()}}
 function tryCode(t){const m=t.match(/[\[{][\s\S]*[\]}]/);if(!m)return null;try{const v=JSON.parse(m[0]);const arr=(Array.isArray(v)?v:(v.recipes||[v])).filter(r=>r&&r.title);return arr.length?arr:null}catch(e){return null}}
@@ -338,7 +360,7 @@ function addSamples(){const now=Date.now();
 document.querySelector('.tabs').addEventListener('click',e=>{const b=e.target.closest('button');if(b)go(b.dataset.v)});
 $('#q').addEventListener('input',renderRecipes);
 $('#v-recipes').addEventListener('click',e=>{const c=e.target.closest('[data-cat]'),card=e.target.closest('.card'),g=e.target.closest('[data-go]');
-  if(c){cat=c.dataset.cat;renderRecipes()}else if(card)openRecipe(card.dataset.id);else if(g)go(g.dataset.go);else if(e.target.id==='samples')addSamples()});
+  const cu=e.target.closest('[data-cui]');if(cu){cui=cu.dataset.cui;renderRecipes();return}if(c){cat=c.dataset.cat;renderRecipes()}else if(card)openRecipe(card.dataset.id);else if(g)go(g.dataset.go);else if(e.target.id==='samples')addSamples()});
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'){closeSheet();return}
   const li=e.target.closest('[data-ing]');if(li){const k=+li.dataset.ing;got.has(k)?got.delete(k):got.add(k);li.classList.toggle('got');return}
   const a=e.target.closest('[data-act]');if(!a)return;const act=a.dataset.act;

@@ -26,7 +26,7 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Nunito Sans",
 h1,h2,h3{font-family:Caprasimo,Georgia,serif;font-weight:400;line-height:1.05;text-wrap:balance;margin:0}
 .top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;justify-content:space-between;padding:calc(env(safe-area-inset-top) + 12px) max(5vw,16px) 12px;background:var(--tom);color:#fff}
 .top h1{font-size:30px}
-.sync{font-size:13px;opacity:.9;text-align:right}
+.sync{font-size:13px;opacity:.9;text-align:right}.topr{display:flex;align-items:center;gap:10px}.pastebtn{font:inherit;font-weight:800;min-height:40px;padding:8px 14px;border-radius:999px;border:0;background:#fff;color:var(--tom);cursor:pointer;white-space:nowrap}
 main{max-width:1000px;margin:0 auto;padding:18px max(5vw,16px) calc(110px + env(safe-area-inset-bottom))}
 .view h2{font-size:32px;margin:6px 0 16px}
 input,textarea,select{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:12px;padding:11px 13px;width:100%}
@@ -81,10 +81,10 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 .badge:empty{display:none}
 .sheet{position:fixed;inset:0;z-index:10;background:rgb(0 0 0/.45);display:flex;align-items:flex-end;justify-content:center}
 .sheet[hidden]{display:none}
-.sheet-in{background:var(--bg);width:100%;max-width:680px;max-height:94vh;overflow-y:auto;border-radius:22px 22px 0 0;padding:20px max(5vw,18px) calc(28px + env(safe-area-inset-bottom));animation:up .25s ease-out}
+.sheet{padding-top:calc(env(safe-area-inset-top) + 16px)}.sheet-in{background:var(--bg);width:100%;max-width:680px;max-height:100%;overflow-y:auto;overscroll-behavior:contain;border-radius:22px 22px 0 0;padding:0 max(5vw,18px) calc(28px + env(safe-area-inset-bottom));animation:up .25s ease-out}.grab{width:44px;height:5px;border-radius:3px;background:var(--line);margin:0 auto 6px}
 @keyframes up{from{transform:translateY(40px);opacity:.4}}
 @media(prefers-reduced-motion:reduce){.sheet-in{animation:none}}
-.shead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.shead{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:10px 0 12px;margin-bottom:4px;touch-action:none}.shead-wrap{position:sticky;top:0;z-index:2;background:var(--bg);padding-top:10px}
 .shead h2{font-size:clamp(28px,7vw,40px)}
 .close{flex:none;width:44px;height:44px;border-radius:50%;border:0;background:var(--panel);color:var(--ink);font-size:22px;cursor:pointer}
 .stepper{display:inline-flex;align-items:center;gap:6px;background:var(--panel);border-radius:999px;padding:4px;margin:14px 0 4px}
@@ -111,7 +111,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 </style>
 </head>
 <body>
-<header class="top"><h1>Recipe Box</h1><span id="sync" class="sync"></span></header>
+<header class="top"><h1>Recipe Box</h1><span class="topr"><span id="sync" class="sync"></span><button id="pasteTop" class="pastebtn">Paste recipe</button></span></header>
 <main>
 <section id="v-recipes" class="view">
   <input id="q" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes">
@@ -122,6 +122,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
   <h2>Add a recipe</h2>
   <div class="panel">
     <h3>Paste a recipe</h3>
+    <button id="pasteAdd" class="btn primary" style="justify-self:start">Paste recipe</button>
     <p class="hint">Copy the text of a Facebook post, website or message (press and hold, then Copy) and paste it below. It works with no signal. For a screenshot, open it in Photos, press and hold on the text, tap Copy, then paste here. A recipe code from Claude goes in here too.</p>
     <textarea id="imp-text" rows="7" placeholder="Paste the post, recipe text or recipe code here"></textarea>
     <button id="imp-go" class="btn primary">Read recipe</button>
@@ -218,7 +219,7 @@ let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=fal
 function openRecipe(id){cur=recipes.find(r=>r.id===id);if(!cur)return;serv=cur.servings||null;got=new Set();showRecipe()}
 function showRecipe(){const r=cur,f=r.servings&&serv?serv/r.servings:1;
   const src=/^https?:\/\//.test(r.source||'')?`<p><a class="src" href="${esc(r.source)}" target="_blank" rel="noopener">Original post</a></p>`:(r.source?`<p class="meta">From ${esc(r.source)}</p>`:'');
-  openSheet(`<div class="shead"><h2>${esc(r.title)}</h2><button class="close" data-act="close" aria-label="Close">×</button></div>
+  openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>${esc(r.title)}</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
   <p class="meta" style="margin:8px 0 0">${esc([r.category,r.time].filter(Boolean).join(' · '))}</p>
   ${r.servings?`<div class="stepper"><button data-act="less" aria-label="Fewer servings">−</button><span>Serves ${serv}</span><button data-act="more" aria-label="More servings">+</button></div>`:''}
   <h3 class="sec">Ingredients</h3><ul class="ings">${(r.ingredients||[]).map((i,k)=>{const q={...i,qty:i.qty!=null?i.qty*f:null};return`<li data-ing="${k}" class="${got.has(k)?'got':''}">${qtyTxt(q)?`<b>${esc(qtyTxt(q))}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>
@@ -233,7 +234,7 @@ function addToShop(items,title){let n=0;for(let i of items){if(!i.item)continue;
 
 /* ---------- editor ---------- */
 function openEditor(r){r=r||{};cur=r.id?r:null;
-  openSheet(`<div class="shead"><h2>${r.id?'Edit recipe':'New recipe'}</h2><button class="close" data-act="close" aria-label="Close">×</button></div>
+  openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>${r.id?'Edit recipe':'New recipe'}</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
   <form class="form" id="ed">
    <label>Title<input name="title" value="${esc(r.title)}" required></label>
    <div class="two"><label>Category<select name="category">${CATS.map(c=>`<option${c===(r.category||'Mains')?' selected':''}>${c}</option>`).join('')}</select></label><label>Serves<input name="servings" type="number" min="1" inputmode="numeric" value="${esc(r.servings||'')}"></label><label>Time<input name="time" value="${esc(r.time)}" placeholder="45 min"></label></div>
@@ -281,7 +282,31 @@ function cleanRecipe(r){return{id:r.id||uid(),title:String(r.title||'Untitled re
   ingredients:(r.ingredients||[]).map(i=>typeof i==='string'?parseLine(i):i).filter(i=>i&&i.item).map(i=>({qty:typeof i.qty==='number'?i.qty:(i.qty?toNum(String(i.qty)):null),unit:i.unit?(UN[String(i.unit).toLowerCase()]||i.unit):'',item:i.item,aisle:AISLES.includes(i.aisle)?i.aisle:guessAisle(i.item)})),
   steps:(r.steps||[]).filter(Boolean).map(String),notes:r.notes||'',source:r.source||'',added:r.added||Date.now()}}
 function tryCode(t){const m=t.match(/[\[{][\s\S]*[\]}]/);if(!m)return null;try{const v=JSON.parse(m[0]);const arr=(Array.isArray(v)?v:(v.recipes||[v])).filter(r=>r&&r.title);return arr.length?arr:null}catch(e){return null}}
+/* ---------- website recipes (schema.org data sent by the Shortcut) ---------- */
+const dec=s=>{const d=document.createElement('textarea');d.innerHTML=String(s??'');return d.value.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()};
+function findRecipe(o){if(!o||typeof o!=='object')return null;if(Array.isArray(o)){for(const x of o){const r=findRecipe(x);if(r)return r}return null}
+  const t=o['@type'];if(t==='Recipe'||(Array.isArray(t)&&t.includes('Recipe')))return o;for(const k of['@graph','mainEntity','itemListElement']){if(o[k]){const r=findRecipe(o[k]);if(r)return r}}return null}
+function isoDur(s){const m=/P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?)?/.exec(s||'');if(!m)return 0;return(+m[1]||0)*1440+(+m[2]||0)*60+(+m[3]||0)}
+const fmtMin=n=>n?(n>=60?Math.floor(n/60)+' hr'+(n%60?' '+n%60+' min':''):n+' min'):'';
+function ldSteps(x){if(!x)return[];if(typeof x==='string')return dec(x).split(/(?<=[.!])\s+(?=[A-Z])|\n+/).filter(Boolean);if(Array.isArray(x))return x.flatMap(ldSteps);
+  if(x.itemListElement)return ldSteps(x.itemListElement);return[dec(x.text||x.name)].filter(Boolean)}
+function fromLd(o,url){const name=dec(o.name)||'Untitled recipe';let y=o.recipeYield;if(Array.isArray(y))y=y[0];const yn=parseInt(String(y||'').match(/\d+/)||'');
+  const tot=isoDur(o.totalTime)||(isoDur(o.prepTime)+isoDur(o.cookTime));const cat=[].concat(o.recipeCategory||[]).join(' ');
+  return{title:name,category:guessCat(name+' '+cat),servings:yn||null,time:fmtMin(tot),
+    ingredients:[].concat(o.recipeIngredient||o.ingredients||[]).map(dec).filter(Boolean).map(l=>{const p=parseLine(l);p.aisle=guessAisle(p.item);return p}),
+    steps:ldSteps(o.recipeInstructions),notes:'',source:url||o.url||''}}
+function fromShortcut(text){let d;try{d=JSON.parse(text)}catch(e){return null}if(!d||d.rb!==1)return null;
+  for(const raw of d.ld||[]){try{const r=findRecipe(JSON.parse(raw));if(r)return fromLd(r,d.url)}catch(e){}}
+  const r=readPost((d.title||'')+'\n'+(d.text||''));r.source=d.url||'';r._weak=true;return r}
+function handleText(text){text=(text||'').trim();if(!text){stat('Nothing to paste. Copy a recipe first.',true);return}
+  if(/^\{\s*"rb"\s*:\s*1/.test(text)){const r=fromShortcut(text);if(!r){stat('Could not read what the Shortcut copied.',true);return}
+    stat(r._weak?'This site had no built-in recipe card, so check it carefully.':'Recipe read from the website. Check it and save.',!!r._weak);delete r._weak;go('add');openEditor(r);return}
+  $('#imp-text').value=text;doImport()}
+async function pasteClip(){let t='';try{t=await navigator.clipboard.readText()}catch(e){}
+  if(!t){go('add');stat('Press and hold in the box below, tap Paste, then tap Read recipe.');$('#imp-text').focus();return}handleText(t)}
+$('#pasteTop').addEventListener('click',pasteClip);$('#pasteAdd').addEventListener('click',pasteClip);
 function doImport(){const text=$('#imp-text').value.trim();if(!text){stat('Paste a post or recipe code first.',true);return}
+  if(/^\{\s*"rb"\s*:\s*1/.test(text)){$('#imp-text').value='';handleText(text);return}
   const code=tryCode(text);
   if(code){if(code.length===1){$('#imp-text').value='';stat('Recipe code read. Check it and save.');openEditor({...cleanRecipe(code[0]),id:undefined});return}
     let n=0;for(const r of code){const c=cleanRecipe(r);if(!recipes.some(x=>x.id===c.id)){recipes.unshift(c);n++}}saveLocal();renderAll();$('#imp-text').value='';stat(`Added ${n} recipe${n===1?'':'s'}.`);return}
@@ -326,6 +351,10 @@ $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'){closeSheet();
   else if(act==='delno')showRecipe();
   else if(act==='delyes'){const id=cur.id;closeSheet();delRecipe(id);toast('Recipe deleted')}});
 addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#sheet').hidden)closeSheet()});
+{let y0=null,dy=0;const si=$('#sheet-in');
+ si.addEventListener('touchstart',e=>{y0=e.target.closest('.shead-wrap')||si.scrollTop<=0?e.touches[0].clientY:null;dy=0},{passive:true});
+ si.addEventListener('touchmove',e=>{if(y0==null)return;dy=e.touches[0].clientY-y0;if(dy>0&&si.scrollTop<=0){si.style.transform=`translateY(${dy}px)`}},{passive:true});
+ si.addEventListener('touchend',()=>{if(y0==null)return;si.style.transform='';if(dy>90&&si.scrollTop<=0)closeSheet();y0=null})}
 $('#addItem').addEventListener('submit',e=>{e.preventDefault();const v=$('#newItem').value.trim();if(!v)return;addToShop([parseLine(v)],'');$('#newItem').value=''});
 $('#shop').addEventListener('change',e=>{const id=e.target.dataset.sid;const s=shop.find(x=>x.id===id);if(s){s.done=e.target.checked;saveShop()}});
 $('#shop').addEventListener('click',e=>{const id=e.target.dataset.del;if(id){shop=shop.filter(s=>s.id!==id);saveShop()}});

@@ -156,6 +156,11 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 .seg button{font:inherit;font-weight:800;min-height:42px;border:0;border-radius:999px;background:none;color:var(--mute);cursor:pointer}
 .seg button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:0 1px 3px rgb(0 0 0/.12)}.seg small{font-weight:600;opacity:.7}
 .trybar{display:flex;gap:8px;flex-wrap:wrap;background:var(--panel);border-radius:14px;padding:12px 14px;margin-top:14px;align-items:center}.trybar p{margin:0;flex-basis:100%;font-size:14px;color:var(--mute)}
+.scalebar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin:14px 0 4px}.scalebar .stepper{margin:0}
+.mults{display:inline-flex;background:var(--panel);border-radius:999px;padding:4px;gap:2px}
+.mults button{font:inherit;font-weight:800;min-width:46px;min-height:40px;border:0;border-radius:999px;background:none;color:var(--ink);cursor:pointer}
+.mults button[aria-pressed=true]{background:var(--tom);color:#fff}
+.unitbtn{font:inherit;font-weight:700;font-size:14px;min-height:40px;padding:6px 14px;border-radius:999px;border:1.5px solid var(--line);background:var(--bg);color:var(--ink);cursor:pointer}
 </style>
 </head>
 <body>
@@ -309,18 +314,30 @@ function closeSheet(){$('#sheet').hidden=true;$('#sheet-in').innerHTML='';docume
 let toastT;function toast(t){const el=$('#toast');el.textContent=t;el.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>el.hidden=true,2600)}
 
 /* ---------- recipe detail ---------- */
-function openRecipe(id){cur=recipes.find(r=>r.id===id);if(!cur)return;serv=cur.servings||null;got=new Set();showRecipe()}
-function showRecipe(){const r=cur,f=r.servings&&serv?serv/r.servings:1,nu=nutOf(r);
+let mult=1,metric=false;try{metric=localStorage.getItem('recipebox.metric')==='1'}catch(e){}
+const scaleF=()=>cur&&cur.servings&&serv?serv/cur.servings:mult;
+const UC={tsp:1,tbsp:3,cup:48};
+function tidy(q,u){if(q==null)return{q,u};
+  if(metric){if(u==='cup'||u==='tbsp'||u==='tsp'){let ml=q*{cup:250,tbsp:15,tsp:5}[u];return ml>=1000?{q:Math.round(ml/50)/20,u:'L'}:{q:ml<20?Math.round(ml*2)/2:Math.round(ml/5)*5,u:'mL'}}
+    if(u==='oz'||u==='lb'){const g=q*(u==='oz'?28.35:453.6);return g>=1000?{q:Math.round(g/10)/100,u:'kg'}:{q:g<50?Math.round(g):Math.round(g/5)*5,u:'g'}}}
+  if(u==='g'&&q>=1000)return{q:q/1000,u:'kg'};if(u==='mL'&&q>=1000)return{q:q/1000,u:'L'};if(u==='oz'&&q>=16)return{q:q/16,u:'lb'};
+  if(u in UC){const t=q*UC[u],c=t/48,nice=x=>Math.abs(x-Math.round(x))<.02;if(t>=12&&(nice(c*4)||nice(c*3)))return{q:c,u:'cup'};if(t>=12&&t<=48&&nice(t/3*2))return{q:t/3,u:'tbsp'};if(t>=12)return{q:c,u:'cup'};if(t>=3&&Math.abs(t/3-Math.round(t/3*4)/4)<.02)return{q:t/3,u:'tbsp'};if(t<3)return{q:t,u:'tsp'};return{q:t/3,u:'tbsp'}}
+  return{q,u}}
+function showQty(i,f){const t=tidy(i.qty!=null?i.qty*f:null,i.unit);return qtyTxt({...i,qty:t.q,unit:t.u})}
+function openRecipe(id){cur=recipes.find(r=>r.id===id);if(!cur)return;serv=cur.servings||null;mult=1;got=new Set();showRecipe()}
+function showRecipe(){const r=cur,f=scaleF(),nu=nutOf(r);
   const src=/^https?:\/\//.test(r.source||'')?`<p><a class="src" href="${esc(r.source)}" target="_blank" rel="noopener">Original post</a></p>`:(r.source?`<p class="meta">From ${esc(r.source)}</p>`:'');
   openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>${esc(r.title)}</h2><div class="hbtns"><button class="star${r.fav?' on':''}" data-act="fav" aria-label="${r.fav?'Remove from':'Add to'} favourites" aria-pressed="${!!r.fav}">${r.fav?'★':'☆'}</button><button class="close" data-act="close" aria-label="Close">×</button></div></div></div>
   ${PH[r.id]?`<img class="hero" src="${PH[r.id]}" alt="">`:''}
   <p class="meta" style="margin:8px 0 0">${esc([cuisineOf(r),r.category,r.time].filter(Boolean).join(' · '))}</p>
   ${cookedTxt(r)?`<p class="cooked">${esc(cookedTxt(r))}</p>`:''}
-  ${r.servings?`<div class="stepper"><button data-act="less" aria-label="Fewer servings">−</button><span>Serves ${serv}</span><button data-act="more" aria-label="More servings">+</button></div>`:''}
+  <div class="scalebar">${r.servings?`<div class="stepper"><button data-act="less" aria-label="Fewer servings">−</button><span>Serves ${fmtQty(serv)}</span><button data-act="more" aria-label="More servings">+</button></div>`:''}
+   <div class="mults" role="group" aria-label="Scale recipe">${[[.5,'½×'],[1,'1×'],[2,'2×'],[3,'3×']].map(([k,l])=>`<button data-mult="${k}" aria-pressed="${Math.abs(f-k)<.001}">${l}</button>`).join('')}</div>
+   <button class="unitbtn" data-act="units" aria-pressed="${metric}">${metric?'Metric':'Cups & spoons'}</button></div>
   ${nu.hit?`<div class="nut"><b>≈ ${Math.round(nu.kcal)} kcal</b><span>${nu.per?'per serving':'whole recipe'}</span><span>Protein ${Math.round(nu.p)} g</span><span>Carbs ${Math.round(nu.c)} g</span><span>Fat ${Math.round(nu.f)} g</span><small>Estimate from ${nu.hit} of ${nu.tot} ingredients${nu.hit<nu.tot?' (the rest weren’t recognised)':''}.</small></div>`:''}
-  ${(()=>{const rc=recipeCost(r,serv);return rc.tot?`<p class="cost">${rc.hit?`<b>≈ ${money(rc.total)}</b>${rc.per!=null?` · ${money(rc.per)} a serving`:''} <span class="meta">(${rc.hit} of ${rc.tot} ingredients priced)</span>`:`<span class="meta">Add prices in your shopping list to see what this costs.</span>`}</p>`:''})()}
+  ${(()=>{const rc=recipeCost(r,serv);if(!r.servings){rc.total*=mult}return rc.tot?`<p class="cost">${rc.hit?`<b>≈ ${money(rc.total)}</b>${rc.per!=null?` · ${money(rc.per)} a serving`:''} <span class="meta">(${rc.hit} of ${rc.tot} ingredients priced)</span>`:`<span class="meta">Add prices in your shopping list to see what this costs.</span>`}</p>`:''})()}
   <div class="acts"><button class="btn primary" data-act="cook">Start cooking</button><button class="btn" data-act="plan">Add to plan</button></div>
-  <h3 class="sec">Ingredients</h3><ul class="ings">${(r.ingredients||[]).map((i,k)=>{const q={...i,qty:i.qty!=null?i.qty*f:null};return`<li data-ing="${k}" class="${got.has(k)?'got':''}">${qtyTxt(q)?`<b>${esc(qtyTxt(q))}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>
+  <h3 class="sec">Ingredients</h3><ul class="ings">${(r.ingredients||[]).map((i,k)=>{const qt=showQty(i,f);return`<li data-ing="${k}" class="${got.has(k)?'got':''}">${qt?`<b>${esc(qt)}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>
   <div class="acts"><button class="btn" data-act="toshop">Add to shopping list</button></div>
   ${(r.steps||[]).length?`<h3 class="sec">Method</h3><ol class="steps">${r.steps.map(s=>`<li>${esc(s)}</li>`).join('')}</ol>`:''}
   ${r.notes?`<h3 class="sec">Notes</h3><div class="notes">${esc(r.notes)}</div>`:''}
@@ -517,16 +534,16 @@ function pickRecipe(k){const d=new Date(k+'T12:00');
 function planChooser(){const r=cur,base=new Date();base.setHours(12,0,0,0);
   const opts=[...Array(14)].map((_,i)=>{const d=new Date(base);d.setDate(base.getDate()+i);return d});
   openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>Plan ${esc(r.title)}</h2><button class="close" data-act="back" aria-label="Back">×</button></div></div>
-  <p class="meta">Which day?${serv?` It will be planned for ${serv}.`:''}</p><div class="daypick">${opts.map((d,i)=>`<button class="chip" data-planday="${dkey(d)}">${i===0?'Today':i===1?'Tomorrow':DAYN[d.getDay()]+' '+MON[d.getMonth()]+' '+d.getDate()}</button>`).join('')}</div>`,'plan')}
+  <p class="meta">Which day?${serv?` It will be planned for ${fmtQty(serv)}.`:''}</p><div class="daypick">${opts.map((d,i)=>`<button class="chip" data-planday="${dkey(d)}">${i===0?'Today':i===1?'Tomorrow':DAYN[d.getDay()]+' '+MON[d.getMonth()]+' '+d.getDate()}</button>`).join('')}</div>`,'plan')}
 
 /* ---------- cook mode ---------- */
 let ck={i:0,lock:null};
 async function wake(){try{if('wakeLock' in navigator){ck.lock=await navigator.wakeLock.request('screen')}}catch(e){}}
-function cookOpen(){if(!cur||!(cur.steps||[]).length){toast('This recipe has no method steps yet');return}ck.r=cur;ck.f=cur.servings&&serv?serv/cur.servings:1;ck.i=0;ck.ings=false;$('#cook').hidden=false;document.body.style.overflow='hidden';cookDraw();wake()}
+function cookOpen(){if(!cur||!(cur.steps||[]).length){toast('This recipe has no method steps yet');return}ck.r=cur;ck.f=scaleF();ck.i=0;ck.ings=false;$('#cook').hidden=false;document.body.style.overflow='hidden';cookDraw();wake()}
 function cookClose(){$('#cook').hidden=true;document.body.style.overflow=$('#sheet').hidden?'':'hidden';try{ck.lock&&ck.lock.release()}catch(e){}ck.lock=null}
 function cookDraw(){const r=ck.r,n=r.steps.length;
   $('#cook-t').textContent=r.title;$('#cook-n').textContent=ck.ings?'Ingredients':`Step ${ck.i+1} of ${n}`;
-  $('#cook-b').innerHTML=ck.ings?`<ul class="ings big">${r.ingredients.map(i=>{const q={...i,qty:i.qty!=null?i.qty*ck.f:null};return`<li>${qtyTxt(q)?`<b>${esc(qtyTxt(q))}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>`:`<p class="cstep">${esc(r.steps[ck.i])}</p>`;
+  $('#cook-b').innerHTML=ck.ings?`<ul class="ings big">${r.ingredients.map(i=>{const qt=showQty(i,ck.f);return`<li>${qt?`<b>${esc(qt)}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>`:`<p class="cstep">${esc(r.steps[ck.i])}</p>`;
   $('#cook-bar').style.width=((ck.i+1)/n*100)+'%';$('#ck-prev').disabled=!ck.ings&&ck.i===0;$('#ck-next').textContent=ck.ings?'Back to steps':ck.i===n-1?'Finished':'Next';$('#ck-ing').textContent=ck.ings?'Steps':'Ingredients'}
 $('#cook').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const n=ck.r.steps.length;
   if(b.id==='ck-x')cookClose();else if(b.id==='ck-ing'){ck.ings=!ck.ings;cookDraw()}
@@ -625,6 +642,7 @@ $('#v-recipes').addEventListener('click',e=>{const c=e.target.closest('[data-cat
 $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'){closeSheet();return}
   const pd=e.target.closest('[data-planday]');if(pd){const k=pd.dataset.planday;(plan[k]=plan[k]||[]).push({rid:cur.id,s:serv||cur.servings||null});saveLocal();const d=new Date(k+'T12:00');toast(`Planned for ${DAYN[d.getDay()]} ${MON[d.getMonth()]} ${d.getDate()}`);showRecipe();return}
   const pk=e.target.closest('[data-pick]');if(pk){const k=pk.dataset.day,r=recipes.find(x=>x.id===pk.dataset.pick);(plan[k]=plan[k]||[]).push({rid:r.id,s:r.servings||null});closeSheet();savePlan();return}
+  const mu=e.target.closest('[data-mult]');if(mu&&cur){const k=+mu.dataset.mult;if(cur.servings)serv=cur.servings*k;else mult=k;showRecipe();return}
   const li=e.target.closest('[data-ing]');if(li){const k=+li.dataset.ing;got.has(k)?got.delete(k):got.add(k);li.classList.toggle('got');return}
   const a=e.target.closest('[data-act]');if(!a)return;const act=a.dataset.act;
   if(act==='close')closeSheet();
@@ -637,9 +655,10 @@ $('#sheet').addEventListener('click',e=>{if(e.target.id==='sheet'){closeSheet();
   else if(act==='keep'){delete cur.box;putRecipe(cur);toast('Moved to My recipes')}
   else if(act==='totry'){cur.box='try';putRecipe(cur);toast('Added to To try')}
   else if(act==='nope'){const id=cur.id;closeSheet();delRecipe(id);toast('Removed')}
-  else if(act==='less'&&serv>1){serv--;showRecipe()}
-  else if(act==='more'){serv++;showRecipe()}
-  else if(act==='toshop'){const f=cur.servings&&serv?serv/cur.servings:1;const n=addToShop(cur.ingredients.map(i=>({...i,qty:i.qty!=null?i.qty*f:null})),cur.title);toast(`Added ${n} item${n===1?'':'s'} to your list`)}
+  else if(act==='less'&&serv>1){serv=Math.max(1,Math.ceil(serv)-1);showRecipe()}
+  else if(act==='units'){metric=!metric;try{localStorage.setItem('recipebox.metric',metric?'1':'0')}catch(e){}showRecipe()}
+  else if(act==='more'){serv=Math.floor(serv)+1;showRecipe()}
+  else if(act==='toshop'){const f=scaleF();const n=addToShop(cur.ingredients.map(i=>({...i,qty:i.qty!=null?i.qty*f:null})),cur.title);toast(`Added ${n} item${n===1?'':'s'} to your list`)}
   else if(act==='edit')openEditor(cur);
   else if(act==='del'){a.outerHTML=`<span class="meta" style="align-self:center">Delete this recipe?</span><button class="btn primary" data-act="delyes">Delete</button><button class="btn ghost" data-act="delno">Keep</button>`}
   else if(act==='delno')showRecipe();

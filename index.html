@@ -139,6 +139,19 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 .cstep{font-size:clamp(24px,6.5vw,34px);line-height:1.35;margin:0}
 .ings.big{width:100%;font-size:20px}
 .cnav{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:10px}.cnav .btn{min-height:58px;font-size:17px}
+.tools{display:flex;gap:8px;margin-top:10px}.tools .btn{flex:1;min-height:42px;padding:8px 10px;font-size:15px}
+.btn.sm{min-height:38px;padding:6px 12px;font-size:14px;flex:none}
+.mkadd{display:flex;gap:8px;margin:10px 0}.mkchips{display:flex;flex-wrap:wrap;gap:8px;max-height:220px;overflow-y:auto;padding:2px}
+.chip.mk[aria-pressed=true]{background:var(--herb);border-color:var(--herb);color:#fff}
+.mkrow{display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+.pr{flex:none;font:inherit;font-weight:800;font-size:14px;min-width:58px;min-height:36px;border-radius:999px;border:1.5px dashed var(--line);background:none;color:var(--mute);cursor:pointer;white-space:nowrap}
+.pr.set{border-style:solid;color:var(--ink)}
+.shoptot{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;background:var(--panel);border-radius:14px;padding:10px 14px;margin-top:14px}
+.shoptot b{font-size:20px}.shoptot span{color:var(--mute);font-size:14px;flex:1}
+.cost{font-size:15px;margin:10px 0 0}.cost b{font-size:17px}
+.budget{background:var(--panel);border-radius:14px;padding:12px 14px;margin:8px 0 4px}
+.budget .row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.budget input{width:110px}
+.bar{height:10px;background:var(--bg);border-radius:5px;margin-top:10px;overflow:hidden}.bar i{display:block;height:100%;background:var(--herb)}.bar i.over{background:var(--tom)}
 </style>
 </head>
 <body>
@@ -146,6 +159,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 <main>
 <section id="v-recipes" class="view">
   <input id="q" type="search" placeholder="Search recipes or ingredients" aria-label="Search recipes">
+  <div class="tools"><button id="wcim" class="btn">What can I make?</button><button id="askAI" class="btn">Ask Claude for ideas</button></div>
   <div id="cuis" class="chips cuis"></div>
   <div id="cats" class="chips"></div>
   <div id="grid"></div>
@@ -153,6 +167,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 <section id="v-plan" class="view" hidden>
   <h2>Meal plan</h2>
   <div class="wknav"><button id="wkPrev" aria-label="Previous week">‹</button><b id="wk"></b><button id="wkThis">Today</button><button id="wkNext" aria-label="Next week">›</button></div>
+  <div class="budget"><div class="row"><b>Weekly budget</b><input id="budgetIn" inputmode="decimal" placeholder="$ e.g. 175" aria-label="Weekly budget"><span id="planCost" class="meta"></span></div><div class="bar"><i id="budgetBar" style="width:0"></i></div></div>
   <div id="days"></div>
   <div class="row-actions"><button id="planShop" class="btn primary">Add these 7 days to shopping list</button><button id="planClear" class="btn ghost">Clear these days</button></div>
   <p class="meta" style="margin-top:14px">Calories are rough estimates worked out from the ingredients.</p>
@@ -180,6 +195,7 @@ input:focus,textarea:focus,select:focus,button:focus-visible{outline:3px solid v
 <section id="v-shopping" class="view" hidden>
   <h2>Shopping list</h2>
   <form id="addItem" class="additem"><input id="newItem" placeholder="Add an item, e.g. 2 L milk" aria-label="New item"><button class="btn primary">Add</button></form>
+  <div id="shoptot"></div>
   <div id="shop"></div>
   <div class="row-actions"><button id="copyList" class="btn">Copy list</button><button id="clearDone" class="btn">Clear checked</button><button id="clearAll" class="btn ghost">Clear all</button></div>
   <p id="shop-status" class="status"></p>
@@ -232,7 +248,7 @@ const UNI={'½':.5,'⅓':1/3,'⅔':2/3,'¼':.25,'¾':.75,'⅛':.125,'⅜':.375,'
 const UN={c:'cup',cup:'cup',cups:'cup',tbsp:'tbsp',tbsps:'tbsp',tbs:'tbsp',tablespoon:'tbsp',tablespoons:'tbsp',tsp:'tsp',tsps:'tsp',teaspoon:'tsp',teaspoons:'tsp',lb:'lb',lbs:'lb',pound:'lb',pounds:'lb',oz:'oz',ounce:'oz',ounces:'oz',g:'g',gram:'g',grams:'g',kg:'kg',ml:'mL',l:'L',litre:'L',litres:'L',liter:'L',liters:'L',can:'can',cans:'can',clove:'clove',cloves:'clove',pinch:'pinch',pinches:'pinch',package:'package',packages:'package',pkg:'package',pkgs:'package',stick:'stick',sticks:'stick',slice:'slice',slices:'slice',bunch:'bunch',bunches:'bunch'};
 const PL={cup:'cups',can:'cans',clove:'cloves',package:'packages',stick:'sticks',slice:'slices',bunch:'bunches',pinch:'pinches'};
 const UNRE=new RegExp('^('+Object.keys(UN).sort((a,b)=>b.length-a.length).join('|')+')\\.?(?:\\s+|$)','i');
-const NUMRE=/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?[½⅓⅔¼¾⅛⅜⅝⅞]?|\.\d+|[½⅓⅔¼¾⅛⅜⅝⅞])(?:\s*(?:-|–|to)\s*[\d.\/½⅓⅔¼¾⅛]+)?\s*/;
+const NUMRE=/^(\d+\s+\d+\/\d+|\d+\s+[½⅓⅔¼¾⅛⅜⅝⅞]|\d+\/\d+|\d+(?:\.\d+)?[½⅓⅔¼¾⅛⅜⅝⅞]?|\.\d+|[½⅓⅔¼¾⅛⅜⅝⅞])(?:\s*(?:-|–|to)\s*[\d.\/½⅓⅔¼¾⅛]+)?\s*/;
 function toNum(t){let n=0;for(const p of t.trim().split(/\s+/)){if(p.includes('/')){const[a,b]=p.split('/');n+=(+a)/(+b||1)}else{const f=p.slice(-1);n+=UNI[f]!=null?UNI[f]+(+p.slice(0,-1)||0):+p}}return isNaN(n)?null:n}
 function parseLine(s){s=s.trim().replace(/^[-•*▢☐]\s*/,'');let qty=null,unit='',rest=s;const m=rest.match(NUMRE);if(m){qty=toNum(m[1]);rest=rest.slice(m[0].length)}const u=rest.match(UNRE);if(u&&(qty!=null||u[1].length>2)){unit=UN[u[1].toLowerCase()];rest=rest.slice(u[0].length)}return{qty,unit,item:rest.replace(/^of\s+/i,'').trim()}}
 const FR=[[0,''],[1/8,'⅛'],[1/4,'¼'],[1/3,'⅓'],[3/8,'⅜'],[1/2,'½'],[5/8,'⅝'],[2/3,'⅔'],[3/4,'¾'],[7/8,'⅞'],[1,'']];
@@ -265,10 +281,12 @@ function renderRecipes(){
   const list=recipes.filter(r=>(cat==='All'||r.category===cat||(cat==='★ Favourites'&&r.fav))&&(cui==='Any'||cuisineOf(r)===cui)&&(!q||(r.title+' '+(r.ingredients||[]).map(i=>i.item).join(' ')).toLowerCase().includes(q)));
   $('#grid').innerHTML=list.length?`<div class="grid">${list.map(r=>{const[c,t]=tileFor(r);return`<button class="card" data-id="${esc(r.id)}"><div class="tile" style="--c:${c};--t:${t}">${PH[r.id]?`<img src="${PH[r.id]}" alt="">`:esc(initials(r.title))}${r.fav?'<span class="fav">★</span>':''}</div><div class="cbody"><b>${esc(r.title)}</b><span class="meta">${esc([r.time,r.servings?'serves '+r.servings:'',cuisineOf(r)||r.category].filter(Boolean).join(' · '))}</span></div></button>`}).join('')}</div>`:`<p class="meta" style="margin-top:20px">${q?`No recipes match “${esc(q)}”.`:`No ${cui!=='Any'?esc(cui)+' ':''}${cat!=='All'?esc(cat).toLowerCase()+' ':''}recipes yet. When you save one, it shows up here, or set the cuisine in Edit.`}</p>`;
 }
-function renderShop(){
+function renderShop(){{const left=shop.filter(x=>!x.done);let t=0,h=0;for(const x of left){const c=costOf(x.item,x.qty,x.unit);if(c!=null){t+=c;h++}}
+  $('#shoptot').innerHTML=shop.length?`${h?`<b>≈ ${money(t)}</b>`:''}<span>${h?`for ${h} of ${left.length} items still to buy`:'Tap $ ? on an item to add its price and see your total.'}</span><button class="btn sm" id="pbook">Price book</button>`:''}
+
   if(!shop.length){$('#shop').innerHTML=`<div class="shopempty">Your list is empty. Open a recipe and tap <b>Add to shopping list</b>, or add items above.</div>`;return}
   $('#shop').innerHTML=AISLES.map(a=>{const its=shop.filter(s=>(s.aisle||'Other')===a).sort((x,y)=>x.done-y.done);if(!its.length)return'';
-    return`<div class="aisle"><h3>${esc(a)}</h3>${its.map(s=>`<div class="item${s.done?' done':''}"><input type="checkbox" id="s_${esc(s.id)}" data-sid="${esc(s.id)}"${s.done?' checked':''}><label for="s_${esc(s.id)}">${qtyTxt(s)?`<span class="q">${esc(qtyTxt(s))}</span>`:''}<span>${esc(s.item)}</span>${s.from&&s.from.length?`<small>for ${esc(s.from.join(', '))}</small>`:''}</label><button class="x" data-del="${esc(s.id)}" aria-label="Remove ${esc(s.item)}">×</button></div>`).join('')}</div>`}).join('');
+    return`<div class="aisle"><h3>${esc(a)}</h3>${its.map(s=>`<div class="item${s.done?' done':''}"><input type="checkbox" id="s_${esc(s.id)}" data-sid="${esc(s.id)}"${s.done?' checked':''}><label for="s_${esc(s.id)}">${qtyTxt(s)?`<span class="q">${esc(qtyTxt(s))}</span>`:''}<span>${esc(s.item)}</span>${s.from&&s.from.length?`<small>for ${esc(s.from.join(', '))}</small>`:''}</label>${(()=>{const c=costOf(s.item,s.qty,s.unit);return`<button class="pr${c!=null?' set':''}" data-pr="${esc(s.id)}" aria-label="Price for ${esc(s.item)}">${c!=null?(c===0?'—':money(c)):'$ ?'}</button>`})()}<button class="x" data-del="${esc(s.id)}" aria-label="Remove ${esc(s.item)}">×</button></div>`).join('')}</div>`}).join('');
 }
 function badges(){$('#b-rec').textContent=recipes.length||'';$('#count').textContent=`${recipes.length} recipe${recipes.length===1?'':'s'} and ${shop.length} list item${shop.length===1?'':'s'} on this phone.`;const n=shop.filter(s=>!s.done).length;$('#b-shop').textContent=n||''}
 function renderAll(){renderRecipes();renderShop();badges();if(!$('#v-plan').hidden)renderPlan();if(cur&&!$('#sheet').hidden&&$('#sheet-in').dataset.mode==='view'){const r=recipes.find(x=>x.id===cur.id);if(r){cur=r;showRecipe()}}}
@@ -291,6 +309,7 @@ function showRecipe(){const r=cur,f=r.servings&&serv?serv/r.servings:1,nu=nutOf(
   ${cookedTxt(r)?`<p class="cooked">${esc(cookedTxt(r))}</p>`:''}
   ${r.servings?`<div class="stepper"><button data-act="less" aria-label="Fewer servings">−</button><span>Serves ${serv}</span><button data-act="more" aria-label="More servings">+</button></div>`:''}
   ${nu.hit?`<div class="nut"><b>≈ ${Math.round(nu.kcal)} kcal</b><span>${nu.per?'per serving':'whole recipe'}</span><span>Protein ${Math.round(nu.p)} g</span><span>Carbs ${Math.round(nu.c)} g</span><span>Fat ${Math.round(nu.f)} g</span><small>Estimate from ${nu.hit} of ${nu.tot} ingredients${nu.hit<nu.tot?' (the rest weren’t recognised)':''}.</small></div>`:''}
+  ${(()=>{const rc=recipeCost(r,serv);return rc.tot?`<p class="cost">${rc.hit?`<b>≈ ${money(rc.total)}</b>${rc.per!=null?` · ${money(rc.per)} a serving`:''} <span class="meta">(${rc.hit} of ${rc.tot} ingredients priced)</span>`:`<span class="meta">Add prices in your shopping list to see what this costs.</span>`}</p>`:''})()}
   <div class="acts"><button class="btn primary" data-act="cook">Start cooking</button><button class="btn" data-act="plan">Add to plan</button></div>
   <h3 class="sec">Ingredients</h3><ul class="ings">${(r.ingredients||[]).map((i,k)=>{const q={...i,qty:i.qty!=null?i.qty*f:null};return`<li data-ing="${k}" class="${got.has(k)?'got':''}">${qtyTxt(q)?`<b>${esc(qtyTxt(q))}</b> `:''}${esc(i.item)}</li>`}).join('')}</ul>
   <div class="acts"><button class="btn" data-act="toshop">Add to shopping list</button></div>
@@ -356,7 +375,7 @@ function readPost(raw){
 function cleanRecipe(r){return{id:r.id||uid(),title:String(r.title||'Untitled recipe'),category:CATS.includes(r.category)?r.category:'Mains',...(CUI_NAMES.includes(r.cuisine)?{cuisine:r.cuisine}:{}),servings:+r.servings||null,time:r.time||'',
   ingredients:(r.ingredients||[]).map(i=>typeof i==='string'?parseLine(i):i).filter(i=>i&&i.item).map(i=>({qty:typeof i.qty==='number'?i.qty:(i.qty?toNum(String(i.qty)):null),unit:i.unit?(UN[String(i.unit).toLowerCase()]||i.unit):'',item:i.item,aisle:AISLES.includes(i.aisle)?i.aisle:guessAisle(i.item)})),
   steps:(r.steps||[]).filter(Boolean).map(String),notes:r.notes||'',source:r.source||'',added:r.added||Date.now()}}
-function tryCode(t){const ix=t.indexOf('RECIPEBOX:');if(ix>=0){try{const v=JSON.parse(t.slice(ix+10).trim());return v&&v.title?[v]:null}catch(e){}}const m=t.match(/[\[{][\s\S]*[\]}]/);if(!m)return null;try{const v=JSON.parse(m[0]);const arr=(Array.isArray(v)?v:(v.recipes||[v])).filter(r=>r&&r.title);return arr.length?arr:null}catch(e){return null}}
+function tryCode(t){const parts=t.split('RECIPEBOX:').slice(1);if(parts.length){const out=[];for(const p of parts){const line=p.trim().split('\n')[0].replace(/^`+(json)?|`+$/g,'').trim();let v=null;try{v=JSON.parse(line)}catch(e){const m=p.match(/\{[\s\S]*\}/);try{v=m&&JSON.parse(m[0])}catch(e2){}}if(v&&v.title)out.push(v)}if(out.length)return out}const m=t.match(/[\[{][\s\S]*[\]}]/);if(!m)return null;try{const v=JSON.parse(m[0]);const arr=(Array.isArray(v)?v:(v.recipes||[v])).filter(r=>r&&r.title);return arr.length?arr:null}catch(e){return null}}
 /* ---------- website recipes (schema.org data sent by the Shortcut) ---------- */
 const dec=s=>{const d=document.createElement('textarea');d.innerHTML=String(s??'');return d.value.replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim()};
 function findRecipe(o){if(!o||typeof o!=='object')return null;if(Array.isArray(o)){for(const x of o){const r=findRecipe(x);if(r)return r}return null}
@@ -381,21 +400,22 @@ async function pasteClip(){let t='';try{t=await navigator.clipboard.readText()}c
   if(!t){go('add');stat('Press and hold in the box below, tap Paste, then tap Read recipe.');$('#imp-text').focus();return}handleText(t)}
 $('#pasteTop').addEventListener('click',pasteClip);$('#pasteAdd').addEventListener('click',pasteClip);
 function doImport(){const text=$('#imp-text').value.trim();if(!text){stat('Paste a post or recipe code first.',true);return}
+  if(applyPriceCode(text)){$('#imp-text').value='';stat('Prices updated.');if(!text.includes('RECIPEBOX:'))return}
   if(/^\{\s*"rb"\s*:\s*1/.test(text)){$('#imp-text').value='';handleText(text);return}
   const code=tryCode(text);
   if(code){if(code.length===1){$('#imp-text').value='';stat('Recipe code read. Check it and save.');openEditor({...cleanRecipe(code[0]),id:undefined});return}
-    let n=0;for(const r of code){const c=cleanRecipe(r);if(!recipes.some(x=>x.id===c.id)){recipes.unshift(c);n++}}saveLocal();renderAll();$('#imp-text').value='';stat(`Added ${n} recipe${n===1?'':'s'}.`);return}
+    let n=0;for(const r of code){const c=cleanRecipe(r);if(!recipes.some(x=>x.id===c.id||x.title.toLowerCase()===c.title.toLowerCase())){recipes.unshift(c);n++}}go('recipes');saveLocal();renderAll();$('#imp-text').value='';stat(`Added ${n} recipe${n===1?'':'s'}.`);return}
   const r=readPost(text);if(!r.ingredients.length&&!r.steps.length){stat('Could not spot a recipe in that. Check it was the whole post, or type it in.',true);return}
   $('#imp-text').value='';stat(r.ingredients.length?'Done. Check it over and save.':'No ingredient list found. Add it in the editor.');openEditor(r)}
 $('#imp-go').addEventListener('click',doImport);
 
 /* ---------- backup ---------- */
 function bk(t,err){const s=$('#bk-status');s.textContent=t;s.classList.toggle('err',!!err)}
-$('#exportBtn').addEventListener('click',async()=>{let photos={};try{const all=await photoAll();for(const k in all)photos[k]=await blobToData(all[k])}catch(e){}const data=JSON.stringify({app:'recipe-box',saved:new Date().toISOString(),recipes,shop,plan,photos});const name='recipe-box-backup-'+new Date().toISOString().slice(0,10)+'.json';
+$('#exportBtn').addEventListener('click',async()=>{let photos={};try{const all=await photoAll();for(const k in all)photos[k]=await blobToData(all[k])}catch(e){}const data=JSON.stringify({app:'recipe-box',saved:new Date().toISOString(),recipes,shop,plan,photos,pantry:[...pantry],prices,budget});const name='recipe-box-backup-'+new Date().toISOString().slice(0,10)+'.json';
   try{const f=new File([data],name,{type:'application/json'});if(navigator.canShare&&navigator.canShare({files:[f]})){await navigator.share({files:[f],title:'Recipe Box backup'});bk('Backup shared. Choose “Save to Files” to keep it.');return}}catch(e){if(e&&e.name==='AbortError')return}
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();bk('Backup saved to your Downloads.')});
 $('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{const d=JSON.parse(await f.text());const rs=(d.recipes||(Array.isArray(d)?d:[])).map(x=>({...cleanRecipe(x),...(x.fav?{fav:true}:{}),...(x.cooked?{cooked:x.cooked}:{})}));let n=0;for(const r of rs){const i=recipes.findIndex(x=>x.id===r.id);if(i>=0)recipes[i]=r;else{recipes.push(r);n++}}
-  if(Array.isArray(d.shop)&&d.shop.length&&!shop.length)shop=d.shop;if(d.plan&&!Object.keys(plan).length)plan=d.plan;for(const k in d.photos||{}){try{await photoPut(k,await (await fetch(d.photos[k])).blob())}catch(e){}}saveLocal();renderAll();bk(`Restored. ${n} new recipe${n===1?'':'s'} added, ${rs.length-n} updated.`)}catch(err){bk('That file is not a Recipe Box backup.',true)}});
+  if(Array.isArray(d.shop)&&d.shop.length&&!shop.length)shop=d.shop;if(d.plan&&!Object.keys(plan).length)plan=d.plan;if(d.prices)prices={...d.prices,...prices};if(d.pantry)for(const x of d.pantry)pantry.add(x);if(d.budget&&!budget)budget=+d.budget;saveExtra();for(const k in d.photos||{}){try{await photoPut(k,await (await fetch(d.photos[k])).blob())}catch(e){}}saveLocal();renderAll();bk(`Restored. ${n} new recipe${n===1?'':'s'} added, ${rs.length-n} updated.`)}catch(err){bk('That file is not a Recipe Box backup.',true)}});
 
 /* ---------- recipes sent by Claude (recipes.json beside the app) ---------- */
 async function pullFeed(){try{const r=await fetch('recipes.json',{cache:'no-store'});if(!r.ok)return;const list=await r.json();let seen=[];try{seen=JSON.parse(localStorage.getItem('recipebox.feed')||'[]')}catch(e){}
@@ -475,6 +495,9 @@ function renderPlan(){const days=planDays(),a=days[0],b=days[6],today=dkey(new D
     return`<div class="day${k===today?' today':''}"><div class="dh"><b>${DAYN[d.getDay()]} <span>${MON[d.getMonth()]} ${d.getDate()}</span></b>${kcs?`<small>≈ ${Math.round(kcs)} kcal a person</small>`:''}</div>
     ${ents.map((e,j)=>{const r=recipes.find(x=>x.id===e.rid);return`<div class="pe"><button class="pe-t" data-open="${esc(r.id)}">${PH[r.id]?`<img src="${PH[r.id]}" alt="">`:`<i style="--c:${tileFor(r)[0]}"></i>`}<span>${esc(r.title)}<small>${e.s?'serves '+e.s:''}</small></span></button><button class="x" data-pdel="${k}|${j}" aria-label="Remove ${esc(r.title)}">×</button></div>`}).join('')}
     <button class="addday" data-padd="${k}">+ Add a recipe</button></div>`}).join('');
+  {let t=0,h=0,tt=0;for(const d of days)for(const e of plan[dkey(d)]||[]){const r=recipes.find(x=>x.id===e.rid);if(!r)continue;const rc=recipeCost(r,e.s);t+=rc.total;h+=rc.hit;tt+=rc.tot}
+   $('#planCost').textContent=n?(h?`≈ ${money(t)}${budget?` of your $${budget}`:''} for these 7 days${budget&&t>budget?` (over by ${money(t-budget)})`:''}${h<tt?'. Some ingredients aren’t priced yet.':''}`:'Add prices in your shopping list to see the cost.'):'';
+   if(document.activeElement!==$('#budgetIn'))$('#budgetIn').value=budget?'$'+budget:'';const pct=budget&&h?Math.min(100,t/budget*100):0;$('#budgetBar').style.width=pct+'%';$('#budgetBar').classList.toggle('over',budget>0&&t>budget);}
   $('#planShop').disabled=!n;$('#planClear').disabled=!n}
 function pickRecipe(k){const d=new Date(k+'T12:00');
   openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>Add to ${DAYN[d.getDay()]} ${MON[d.getMonth()]} ${d.getDate()}</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
@@ -511,6 +534,72 @@ function recipeText(r){const lines=[r.title,[cuisineOf(r),r.category,r.time,r.se
   lines.push('','To add this to Recipe Box, copy this whole message and tap Paste recipe.','RECIPEBOX:'+JSON.stringify(code));return lines.join('\n')}
 async function shareRecipe(r){const text=recipeText(r);try{if(navigator.share){await navigator.share({title:r.title,text});return}}catch(e){if(e&&e.name==='AbortError')return}
   try{await navigator.clipboard.writeText(text);toast('Recipe copied. Paste it into a text or email.')}catch(e){toast('Sharing is not available here')}}
+
+/* ---------- ingredient names, pantry, prices ---------- */
+const PREP=/\b(chopped|diced|minced|sliced|grated|shredded|crushed|fresh|freshly|large|medium|small|finely|roughly|thinly|coarsely|cubed|peeled|melted|softened|cold|warm|hot|boneless|skinless|optional|divided|packed|heaping|level|about|approximately|to taste|plus more|or more|room temperature)\b/g;
+const core=s=>(s||'').toLowerCase().replace(/\(.*?\)/g,' ').split(/,| for | cut into | to serve/)[0].replace(PREP,' ').replace(/[^a-z' ]/g,' ').replace(/\s+/g,' ').trim();
+const sing=s=>s.replace(/ies\b/g,'y').replace(/oes\b/g,'o').replace(/(ch|sh)es\b/g,'$1').replace(/([^s])s\b/g,'$1');
+const pkey=s=>sing(core(s));
+const isStaple=s=>NUT[0][0].test((s||'').toLowerCase());
+let pantry=new Set(),prices={},budget=0;
+function loadExtra(){try{const d=JSON.parse(localStorage.getItem('recipebox.v2')||'{}');pantry=new Set(d.pantry||[]);prices=d.prices||{};budget=+d.budget||0}catch(e){}}
+function saveExtra(){try{localStorage.setItem('recipebox.v2',JSON.stringify({pantry:[...pantry],prices,budget}))}catch(e){}}
+const money=n=>'$'+(n<10?n.toFixed(2):n<100?n.toFixed(2):Math.round(n).toString());
+const DEFN=[null,1,0,0,0,240];
+function costOf(item,qty,unit){if(isStaple(item))return 0;const pr=prices[pkey(item)];if(!pr)return null;const n=nutFor(item)||DEFN;
+  const g1=gramsOf({qty:qty??1,unit,item},n),g0=gramsOf({qty:pr.q||1,unit:pr.u,item},n);if(!g0||g1==null)return null;return pr.p*g1/g0}
+function recipeCost(r,serves){let t=0,hit=0,tot=0;const f=r.servings&&serves?serves/r.servings:1;
+  for(const i of r.ingredients||[]){if(!i.item||isStaple(i.item))continue;tot++;const c=costOf(i.item,i.qty!=null?i.qty*f:null,i.unit);if(c==null)continue;hit++;t+=c}
+  return{total:t,hit,tot,per:(serves||r.servings)?t/(serves||r.servings):null}}
+
+/* ---------- what can I make? ---------- */
+function haveIng(i){if(isStaple(i.item))return true;const k=pkey(i.item);if(!k)return true;for(const p of pantry){if(k===p||k.includes(p)||p.includes(k))return true}return false}
+function allIngs(){const m=new Map();for(const r of recipes)for(const i of r.ingredients||[]){if(!i.item||isStaple(i.item))continue;const k=pkey(i.item);if(k&&k.length>1)m.set(k,(m.get(k)||0)+1)}
+  return[...m.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0])).map(x=>x[0])}
+function openMake(){openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>What can I make?</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
+  <p class="meta">Tick what you have. Salt, pepper, water and spices are assumed.</p>
+  <div class="mkadd"><input id="mkq" placeholder="Filter, or add something you have"><button class="btn" id="mkadd">Add</button></div>
+  <div id="mkchips" class="mkchips"></div>
+  <div class="acts" style="margin-top:8px"><button class="btn ghost" id="mkclr">Clear all ticks</button><button class="btn" id="askAI2">Ask Claude for ideas</button></div>
+  <h3 class="sec">You can make</h3><div id="mkres"></div>`,'make');mkDraw()}
+function mkDraw(){if(!$('#mkchips'))return;const q=$('#mkq').value.trim().toLowerCase();const names=[...new Set([...pantry,...allIngs()])].filter(n=>!q||n.includes(q));
+  $('#mkchips').innerHTML=names.length?names.map(n=>`<button class="chip mk" data-mk="${esc(n)}" aria-pressed="${pantry.has(n)}">${pantry.has(n)?'✓ ':''}${esc(n)}</button>`).join(''):`<p class="meta">${q?'Tap Add to add it.':'Save some recipes first.'}</p>`;
+  const rows=recipes.map(r=>{const ings=(r.ingredients||[]).filter(i=>i.item);const miss=ings.filter(i=>!haveIng(i));return{r,miss,have:ings.length-miss.length,n:ings.length}}).filter(x=>x.n)
+    .sort((a,b)=>a.miss.length-b.miss.length||(b.have/b.n)-(a.have/a.n));
+  const stale=recipes.filter(r=>r.fav&&(!r.cooked||!r.cooked.length||(Date.now()-new Date(r.cooked[r.cooked.length-1]+'T12:00'))>30*864e5));
+  $('#mkres').innerHTML=(rows.length?rows.slice(0,12).map(x=>`<div class="mkrow"><button class="pe-t" data-open="${esc(x.r.id)}">${PH[x.r.id]?`<img src="${PH[x.r.id]}" alt="">`:`<i style="--c:${tileFor(x.r)[0]}"></i>`}<span>${esc(x.r.title)}<small>${x.miss.length?`Missing ${x.miss.length}: ${esc(x.miss.slice(0,4).map(i=>core(i.item)).join(', '))}${x.miss.length>4?'…':''}`:'You have everything'}</small></span></button>${x.miss.length?`<button class="btn sm" data-miss="${esc(x.r.id)}">Add missing</button>`:''}</div>`).join(''):`<p class="meta">No recipes yet.</p>`)
+   +(stale.length?`<h3 class="sec">Favourites you haven’t made lately</h3>${stale.map(r=>`<button class="pe-t pick" data-open="${esc(r.id)}">${PH[r.id]?`<img src="${PH[r.id]}" alt="">`:`<i style="--c:${tileFor(r)[0]}"></i>`}<span>${esc(r.title)}<small>${esc(cookedTxt(r)||'Not cooked yet')}</small></span></button>`).join('')}`:'')}
+
+/* ---------- ask Claude ---------- */
+function topCuisines(){const c={};for(const r of recipes){const k=cuisineOf(r);if(k)c[k]=(c[k]||0)+(r.fav?3:1)}return Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0])}
+function aiPrompt(){const have=[...pantry],cu=topCuisines(),mine=recipes.slice(0,40).map(r=>r.title);
+  return[`I use a recipe app called Recipe Box. Please suggest 3 recipes for me.`,
+   have.length?`Ingredients I have on hand: ${have.join(', ')}. Use mostly these; keep extra shopping short.`:'',
+   budget?`My grocery budget is about $${budget} a week, so keep them budget-friendly.`:'Keep them budget-friendly.',
+   cu.length?`Cuisines I like: ${cu.join(', ')}.`:'',
+   mine.length?`Recipes I already have (please suggest different ones): ${mine.join('; ')}.`:'',
+   `Write each recipe out normally. Then, at the very end of each one, add one line that starts with RECIPEBOX: followed by the recipe as JSON on a single line, with keys: title, category (one of ${CATS.join(', ')}), cuisine (one of ${CUI_NAMES.join(', ')}), servings (number), time, ingredients (array of strings like "2 cups flour"), steps (array of strings), notes.`].filter(Boolean).join('\n\n')}
+async function askClaude(){const t=aiPrompt();let ok=false;try{await navigator.clipboard.writeText(t);ok=true}catch(e){}
+  openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>Ask Claude for ideas</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
+  <ol class="steps"><li>${ok?'Your request is copied.':'Copy the request below.'}</li><li>Open Claude, start a new chat, paste and send.</li><li>When Claude answers, tap its <b>Copy</b> button under the reply.</li><li>Come back here and tap <b>Paste recipe</b>. All the suggested recipes are added.</li></ol>
+  <div class="acts"><a class="btn primary" href="https://claude.ai/new" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Open Claude</a><button class="btn" id="aicopy">Copy request again</button></div>
+  <details style="margin-top:14px"><summary class="meta">See the request</summary><textarea readonly rows="10" style="margin-top:8px">${esc(t)}</textarea></details>`,'ai');
+  $('#aicopy').addEventListener('click',async()=>{try{await navigator.clipboard.writeText(t);toast('Copied')}catch(e){toast('Press and hold in the box to copy')}})}
+
+/* ---------- price editor ---------- */
+const UOPT=[['','each'],['lb','lb'],['kg','kg'],['g','g'],['oz','oz'],['L','L'],['mL','mL'],['cup','cup'],['can','can'],['package','package'],['bunch','bunch'],['dozen','dozen']];
+function openPrice(item,qty,unit){const k=pkey(item),pr=prices[k]||{p:'',q:qty||1,u:unit||''};
+  openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>Price of ${esc(k)}</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
+  <p class="meta">What did you pay, and for how much? The app remembers it for every recipe and list.</p>
+  <form id="prf" class="form"><div class="two"><label>Price ($)<input name="p" inputmode="decimal" value="${esc(pr.p)}" placeholder="6.49" required></label><label>For<input name="q" inputmode="decimal" value="${esc(fmtQty(pr.q)||1)}"></label><label>Unit<select name="u">${UOPT.map(([v,l])=>`<option value="${v}"${v===(pr.u==='dozen'?'dozen':pr.u)?' selected':''}>${l}</option>`).join('')}</select></label></div>
+  <div class="acts"><button class="btn primary">Save price</button>${prices[k]?'<button type="button" class="btn ghost" id="prdel">Forget price</button>':''}</div></form>`,'price');
+  $('#prf').addEventListener('submit',e=>{e.preventDefault();const f=new FormData(e.target);const p=parseFloat(String(f.get('p')).replace(/[$,]/g,''));if(!(p>=0)){toast('Enter a price');return}
+    let q=toNum(String(f.get('q')||'1'))||1,u=f.get('u');if(u==='dozen'){q*=12;u=''}prices[k]={p,q,u,d:dkey(new Date())};saveExtra();closeSheet();renderShop();toast('Price saved')});
+  const d=$('#prdel');if(d)d.addEventListener('click',()=>{delete prices[k];saveExtra();closeSheet();renderShop()})}
+function openPriceBook(){const ks=Object.keys(prices).sort();
+  openSheet(`<div class="shead-wrap"><div class="grab"></div><div class="shead"><h2>Price book</h2><button class="close" data-act="close" aria-label="Close">×</button></div></div>
+  ${ks.length?ks.map(k=>{const p=prices[k];return`<div class="item"><label style="cursor:default"><span>${esc(k)}</span><small>${money(p.p)} for ${esc(fmtQty(p.q))} ${esc(p.u||'each')}${p.d?' · '+esc(p.d):''}</small></label><button class="btn sm" data-pedit="${esc(k)}">Edit</button></div>`}).join(''):'<p class="meta">No prices yet. Tap the $ next to any shopping list item to add one.</p>'}`,'book')}
+function applyPriceCode(t){const ix=t.indexOf('RBPRICES:');if(ix<0)return false;try{const v=JSON.parse(t.slice(ix+9).trim().split('\n')[0]);let n=0;for(const k in v){const x=v[k];if(x&&x.p>=0){prices[pkey(k)]={p:+x.p,q:+x.q||1,u:x.u||'',d:dkey(new Date())};n++}}saveExtra();renderAll();toast(`Updated ${n} price${n===1?'':'s'}`);return true}catch(e){return false}}
 
 /* ---------- samples ---------- */
 const L=s=>s.split('\n').map(x=>{const p=parseLine(x);p.aisle=guessAisle(p.item);return p});
@@ -562,8 +651,22 @@ $('#days').addEventListener('click',e=>{const o=e.target.closest('[data-open]'),
 $('#planShop').addEventListener('click',()=>{let n=0,m=0;for(const d of planDays()){for(const e of plan[dkey(d)]||[]){const r=recipes.find(x=>x.id===e.rid);if(!r)continue;const f=r.servings&&e.s?e.s/r.servings:1;n+=addToShop(r.ingredients.map(i=>({...i,qty:i.qty!=null?i.qty*f:null})),r.title);m++}}toast(`Added ${m} recipe${m===1?'':'s'} (${n} items) to your list`)});
 {let arm=0;$('#planClear').addEventListener('click',e=>{if(Date.now()-arm<4000){for(const d of planDays())delete plan[dkey(d)];savePlan();e.target.textContent='Clear these days';arm=0}else{arm=Date.now();e.target.textContent='Tap again to clear';setTimeout(()=>e.target.textContent='Clear these days',4000)}})}
 
+$('#wcim').addEventListener('click',openMake);$('#askAI').addEventListener('click',askClaude);
+$('#shoptot').addEventListener('click',e=>{if(e.target.id==='pbook')openPriceBook()});
+$('#shop').addEventListener('click',e=>{const b=e.target.closest('[data-pr]');if(!b)return;const it=shop.find(x=>x.id===b.dataset.pr);if(it)openPrice(it.item,it.qty,it.unit)});
+$('#budgetIn').addEventListener('change',e=>{budget=parseFloat(e.target.value.replace(/[$,]/g,''))||0;saveExtra();renderPlan()});
+$('#sheet').addEventListener('input',e=>{if(e.target.id==='mkq')mkDraw()});
+$('#sheet').addEventListener('click',e=>{const t=e.target;
+  const mk=t.closest('[data-mk]');if(mk){const n=mk.dataset.mk;pantry.has(n)?pantry.delete(n):pantry.add(n);saveExtra();mkDraw();return}
+  if(t.id==='mkadd'){const v=pkey($('#mkq').value);if(v){pantry.add(v);saveExtra();$('#mkq').value='';mkDraw()}return}
+  if(t.id==='mkclr'){pantry.clear();saveExtra();mkDraw();return}
+  if(t.id==='askAI2'){askClaude();return}
+  const ms=t.closest('[data-miss]');if(ms){const r=recipes.find(x=>x.id===ms.dataset.miss);const n=addToShop(r.ingredients.filter(i=>i.item&&!haveIng(i)),r.title);toast(`Added ${n} missing item${n===1?'':'s'} to your list`);return}
+  const op=t.closest('[data-open]');if(op&&$('#sheet-in').dataset.mode==='make'){openRecipe(op.dataset.open);return}
+  const pe=t.closest('[data-pedit]');if(pe){const p=prices[pe.dataset.pedit];openPrice(pe.dataset.pedit,p.q,p.u);return}});
+
 /* ---------- start ---------- */
-loadLocal();show(location.hash.slice(1));renderAll();
+loadLocal();loadExtra();show(location.hash.slice(1));renderAll();
 setSync(navigator.onLine?'':'Offline');addEventListener('online',()=>{setSync('');pullFeed()});addEventListener('offline',()=>setSync('Offline'));
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 if('serviceWorker' in navigator){navigator.serviceWorker.register('sw.js').catch(()=>{});let had=!!navigator.serviceWorker.controller;navigator.serviceWorker.addEventListener('controllerchange',()=>{if(had)toast('App updated');had=true})}

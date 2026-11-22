@@ -380,7 +380,7 @@ const HEAD_STEP=/^(instructions?|directions?|method|steps?|preparation|how to ma
 const HEAD_NOTE=/^(notes?|tips?)\b[\s:]*$/i;
 function guessCat(t){t=t.toLowerCase();if(/muffin|cake|bread|cookie|loaf|scone|biscuit|bun|roll/.test(t))return'Baking';if(/soup|chowder|stew|broth/.test(t))return'Soups';if(/salad/.test(t))return'Salads';if(/pancake|waffle|breakfast|omelet|granola/.test(t))return'Breakfast';if(/grunt|cobbler|crisp|pie|pudding|dessert|crumble|cheesecake|fudge|square/.test(t))return'Desserts';if(/drink|smoothie|cocktail|punch/.test(t))return'Drinks';if(/dip|snack|bites/.test(t))return'Snacks';if(/side|mash|roasted vegetables/.test(t))return'Sides';return'Mains'}
 function looksIng(l){return l.length<90&&(NUMRE.test(l.replace(/^[-•*▢☐]\s*/,''))||/^[-•*▢☐]/.test(l))&&!/^\d+[.)]\s+\S+\s+\S+\s+\S+\s+\S+\s+\S+/.test(l)}
-function readPost(raw){
+function readPost(raw){if(/&(#\d+|#x[\da-f]+|quot|amp|apos|lt|gt);/i.test(raw)){const t=document.createElement('textarea');t.innerHTML=raw;raw=t.value.replace(/\\n/g,'\n')}
   const url=(raw.match(/https?:\/\/\S+/)||[''])[0];
   let lines=raw.replace(EMO,' ').split(/\r?\n/).map(l=>l.replace(/#\w+/g,'').replace(/\s+/g,' ').replace(/…?\s*see more$/i,'').trim()).filter(l=>l&&!/^https?:\/\//.test(l)&&!/^(like|comment|share|reply|follow)\b/i.test(l));
   const servM=raw.match(/(?:serves|servings|makes|yield)[:\s]*(?:about\s*)?(\d+)/i);
@@ -432,6 +432,7 @@ function doImport(){const text=$('#imp-text').value.trim();if(!text){stat('Paste
   const code=tryCode(text);
   if(code){if(code.length===1){$('#imp-text').value='';stat('Recipe code read. Check it and save.');openEditor({...cleanRecipe(code[0]),id:undefined});return}
     let n=0;for(const r of code){const c=cleanRecipe(r);if(!recipes.some(x=>x.id===c.id||x.title.toLowerCase()===c.title.toLowerCase())){recipes.unshift({...c,box:'idea'});n++}}boxView='idea';go('recipes');saveLocal();renderAll();$('#imp-text').value='';stat(`Added ${n} recipe${n===1?'':'s'} to Ideas.`);return}
+  if(/^https?:\/\/\S+$/.test(text)&&/facebook|fb\.watch|instagram/.test(text)){stat('That’s just a link. Facebook doesn’t let apps read posts from a link, so copy the caption text instead, or open the post in Safari and use Share → Send to Recipe Box.',true);return}
   const r=readPost(text);if(!r.ingredients.length&&!r.steps.length){stat('Could not spot a recipe in that. Check it was the whole post, or type it in.',true);return}
   $('#imp-text').value='';stat(r.ingredients.length?'Done. Check it over and save.':'No ingredient list found. Add it in the editor.');openEditor(r)}
 $('#imp-go').addEventListener('click',doImport);

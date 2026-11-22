@@ -442,5 +442,44 @@
    "Bake at 350°F for 35 to 40 minutes until it sounds hollow when tapped."
   ],
   "source": "Suggested by Claude"
+ },
+ {
+  "id": "c-20261122-01",
+  "title": "General Tso's Chicken",
+  "category": "Mains",
+  "cuisine": "Chinese",
+  "servings": 4,
+  "time": "40 min",
+  "ingredients": [
+   "1 1/2 lb boneless chicken thighs, cut in bite-size pieces",
+   "1 egg",
+   "1/2 cup cornstarch",
+   "1/4 cup flour",
+   "1/2 tsp salt",
+   "4 cups vegetable oil, for frying",
+   "3 tbsp soy sauce",
+   "2 tbsp hoisin sauce",
+   "2 tbsp rice vinegar",
+   "3 tbsp sugar",
+   "1/2 cup chicken broth",
+   "1 tbsp cornstarch, for the sauce",
+   "1 tbsp vegetable oil",
+   "4 cloves garlic, minced",
+   "1 tbsp grated ginger",
+   "6 dried red chilies",
+   "2 green onions, sliced",
+   "2 cups rice"
+  ],
+  "steps": [
+   "Cook the rice.",
+   "Toss the chicken with the egg, then with the 1/2 cup cornstarch, flour and salt until well coated.",
+   "Heat the frying oil to 350°F in a deep pot. Fry the chicken in batches for 5 to 6 minutes until golden and cooked through. Drain on paper towels.",
+   "For extra crunch, fry everything a second time for 1 minute.",
+   "Whisk the soy sauce, hoisin, vinegar, sugar, broth and 1 tbsp cornstarch together.",
+   "In a large pan, heat 1 tbsp oil and fry the garlic, ginger and chilies for 30 seconds. Pour in the sauce and stir until thick and glossy.",
+   "Toss in the chicken until coated. Top with green onions and serve with rice."
+  ],
+  "notes": "Air fryer option: spray the coated chicken with oil and air fry at 400°F for 12 to 15 minutes, shaking halfway.",
+  "source": "Suggested by Claude"
  }
 ]

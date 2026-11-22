@@ -1,15 +1,26 @@
 // Recipe Box offline cache. Bump VERSION on every release so phones pick up the update.
-const VERSION='rb-2026-11-22b';
+const VERSION='rb-2026-11-22c';
 const CORE=['./','index.html','manifest.webmanifest','icon-180.png','icon-192.png','icon-512.png'];
-self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
+self.addEventListener('install',e=>{e.waitUntil(caches.open(VERSION).then(c=>c.addAll(CORE.map(u=>new Request(u,{cache:'reload'})))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==VERSION).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
 self.addEventListener('fetch',e=>{
   const req=e.request;if(req.method!=='GET')return;
   const url=new URL(req.url);
-  if(url.pathname.endsWith('recipes.json'))return; // always live; app ignores failures
-  // Serve from cache straight away (works with no signal), refresh the cache in the background.
+  if(url.pathname.endsWith('recipes.json'))return; // always live; the app ignores failures
+  const page=req.mode==='navigate'||url.pathname.endsWith('/')||url.pathname.endsWith('index.html');
+  if(page){
+    // The page itself: try the network first (so updates show straight away), fall back to the saved copy within 3 s or when offline.
+    e.respondWith(caches.open(VERSION).then(async c=>{
+      const saved=await c.match('index.html');
+      const net=fetch(new Request(req,{cache:'no-cache'})).then(r=>{if(r&&r.ok)c.put('index.html',r.clone());return r});
+      if(!saved)return net;
+      return Promise.race([net.catch(()=>saved),new Promise(res=>setTimeout(()=>res(saved),3000))]);
+    }));
+    return;
+  }
+  // Everything else: serve the saved copy straight away and refresh it in the background.
   e.respondWith(caches.open(VERSION).then(async c=>{
-    const hit=await c.match(req,{ignoreSearch:true})||(req.mode==='navigate'&&await c.match('index.html'));
+    const hit=await c.match(req,{ignoreSearch:true});
     const net=fetch(req).then(r=>{if(r&&(r.ok||r.type==='opaque'))c.put(req,r.clone());return r}).catch(()=>hit);
     return hit||net;
   }));

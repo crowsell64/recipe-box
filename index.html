@@ -447,27 +447,27 @@ $('#importFile').addEventListener('change',async e=>{const f=e.target.files[0];e
 
 /* ---------- recipes sent by Claude (recipes.json beside the app) ---------- */
 async function pullFeed(){try{const r=await fetch('recipes.json',{cache:'no-store'});if(!r.ok)return;const list=await r.json();let seen=[];try{seen=JSON.parse(localStorage.getItem('recipebox.feed')||'[]')}catch(e){}
-  let n=0;for(const x of (Array.isArray(list)?list:list.recipes||[])){if(!x||!x.id||seen.includes(x.id))continue;seen.push(x.id);if(!recipes.some(y=>y.id===x.id)){recipes.unshift({...cleanRecipe({...x,added:Date.now()}),box:'idea'});n++}}
-  try{localStorage.setItem('recipebox.feed',JSON.stringify(seen))}catch(e){}if(n){if(!recipes.some(r=>!r.box))boxView='idea';saveLocal();renderAll();toast(`${n} new recipe idea${n===1?'':'s'} from Claude`)}}catch(e){}}
+  let n=0;for(const x of (Array.isArray(list)?list:list.recipes||[])){if(!x||!x.id||seen.includes(x.id))continue;seen.push(x.id);if(!recipes.some(y=>y.id===x.id)){{const c=cleanRecipe({...x,added:Date.now()});if(x.box!=='mine')c.box=x.box==='try'?'try':'idea';recipes.unshift(c);n++}}}
+  try{localStorage.setItem('recipebox.feed',JSON.stringify(seen))}catch(e){}if(n){if(!recipes.some(r=>!r.box))boxView='idea';saveLocal();renderAll();toast(`${n} new recipe${n===1?'':'s'} from Claude`)}}catch(e){}}
 $('#manual').addEventListener('click',()=>openEditor(null));
 
 /* ---------- nutrition (estimates per 100 g: kcal, protein, carbs, fat; grams per cup; grams each; grams per can) ---------- */
 const NUT=[
- [/\bwater\b|pepper flakes|chili flakes|salt\b(?! (beef|cod|pork))|black pepper|^pepper|ground pepper|baking (powder|soda)|vanilla|spice|cinnamon|nutmeg|paprika|cumin|oregano|thyme|savou?ry|basil|bay lea|chili powder|garlic powder|onion powder|seasoning|allspice|cloves? ground|ginger, ground|turmeric|garam masala|curry powder|sumac|food colou?r|hot sauce|to taste/,0,0,0,0,240],
+ [/\bwater\b|pepper flakes|chili flakes|salt\b(?! (beef|cod|pork))|black pepper|^pepper|ground pepper|baking (powder|soda)|vanilla|spice|cinnamon|ground cloves|nutmeg|paprika|cumin|oregano|thyme|savou?ry|basil|bay lea|chili powder|garlic powder|onion powder|seasoning|allspice|cloves? ground|ginger, ground|turmeric|garam masala|curry powder|sumac|food colou?r|hot sauce|to taste/,0,0,0,0,240],
  [/soy sauce|fish sauce|oyster sauce|hoisin|worcestershire/,60,6,10,0.3,255],[/vinegar/,20,0,0.5,0,240],[/mustard/,66,4,6,4,250],[/lemon juice|lime juice/,22,0.4,7,0.2,244],[/clam juice/,2,0.4,0,0,240],
  [/(chicken|beef|vegetable|fish) (stock|broth)|\bstock\b|\bbroth\b|bouillon/,6,0.6,0.5,0.2,240,0,284],
  [/heavy cream|whipping cream|35%/,340,2.8,2.7,36,238],[/sour cream/,193,2.4,4.6,19,230],[/cream cheese/,342,6,4,34,232,0,0,250],[/half.and.half|10% cream|\bcream\b/,130,3,4.3,11.5,242],
  [/evaporated milk/,134,6.8,10,7.6,252,0,354],[/condensed milk/,321,8,54,8.7,306,0,300],[/buttermilk/,40,3.3,4.8,0.9,245],[/coconut milk/,230,2.3,6,24,240,0,400],[/\bmilk\b/,61,3.2,4.8,3.3,245],
  [/greek yog/,97,9,4,5,245],[/yog/,63,5,7,1.6,245],
  [/rolled oats|\boats\b|oatmeal/,389,17,66,7,81],[/\brice\b/,365,7,80,0.7,185],[/pasta|spaghetti|penne|macaroni|noodle|fettuccine|linguine|lasagn|orzo/,371,13,75,1.5,100],
- [/tortilla/,310,8,52,7,0,45],[/pita|naan/,275,9,56,1.2,0,60],[/bread ?crumbs|panko/,395,13,72,5,108],[/bread|bun\b|buns\b|roll\b|rolls\b|baguette/,265,9,49,3.2,0,30],
+ [/tortilla/,310,8,52,7,0,45],[/pita|naan/,275,9,56,1.2,0,60],[/bread flour/,361,12,72,1.7,127],[/bread ?crumbs|panko/,395,13,72,5,108],[/bread|bun\b|buns\b|roll\b|rolls\b|baguette/,265,9,49,3.2,0,30],
  [/parmesan|parmigiano/,431,38,4,29,100],[/mozzarella/,280,28,3,17,112],[/feta/,264,14,4,21,150],[/ricotta/,174,11,3,13,246],[/cheddar|\bcheese\b|swiss|gouda|monterey/,403,25,1.3,33,113],
  [/peanut butter/,588,25,20,50,258],[/butter(?!milk| beans)|margarine/,717,0.9,0.1,81,227,113],
  [/\begg whites?\b/,52,11,0.7,0.2,243,33],[/\beggs?\b|egg yolk/,143,12.6,0.7,9.5,243,50],
  [/olive oil|vegetable oil|canola|\boil\b|shortening|lard/,884,0,0,100,216],[/mayo/,680,1,0.6,75,220],
  [/brown sugar/,380,0,98,0,220],[/icing sugar|powdered sugar|confectioner/,389,0,100,0,120],[/sugar/,387,0,100,0,200],
  [/honey/,304,0.3,82,0,340],[/maple syrup|syrup/,260,0,67,0,315],[/molasses/,290,0,75,0.1,337],
- [/cornstarch|corn starch/,381,0.3,91,0.1,128],[/whole wheat flour/,340,13,72,2.5,120],[/flour/,364,10,76,1,125],
+ [/cornstarch|corn starch/,381,0.3,91,0.1,128],[/whole wheat flour/,340,13,72,2.5,120],[/bread flour/,361,12,72,1.7,127],[/flour/,364,10,76,1,125],
  [/cocoa/,228,20,58,14,86],[/chocolate chip/,480,4.2,63,24,170],[/chocolate/,546,4.9,61,31,170],
  [/almond|walnut|pecan|cashew|\bnuts?\b|hazelnut/,600,15,20,55,120],[/raisin|currant|dried cranberr/,299,3,79,0.5,145],
  [/lean ground beef|extra lean/,176,20,0,10,225],[/ground beef|minced beef|hamburger/,215,18.6,0,15,225],
